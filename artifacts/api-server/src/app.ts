@@ -4,9 +4,24 @@ import pinoHttp from "pino-http";
 import router from "./routes";
 import { logger } from "./lib/logger";
 
+function getPublicOriginsFromEnv(): string[] {
+  const rawPublicUrl = process.env.PUBLIC_URL?.trim();
+  if (!rawPublicUrl) return [];
+
+  try {
+    const parsed = new URL(rawPublicUrl);
+    return [parsed.origin];
+  } catch {
+    const hostname = rawPublicUrl.replace(/^https?:\/\//, "").replace(/\/$/, "");
+    if (!hostname) return [];
+    return [`http://${hostname}`, `https://${hostname}`];
+  }
+}
+
 const ALLOWED_ORIGINS = [
   "https://www.techsin.com.br",
   "https://techsin.com.br",
+  ...getPublicOriginsFromEnv(),
   ...(process.env.NODE_ENV !== "production"
     ? [/^https?:\/\/.*\.replit\.dev$/, /^https?:\/\/.*\.repl\.co$/, "http://localhost"]
     : []),
