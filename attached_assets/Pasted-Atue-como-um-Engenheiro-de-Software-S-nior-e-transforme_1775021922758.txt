@@ -1,0 +1,47 @@
+Atue como um Engenheiro de Software Sênior e transforme este projeto em uma Plataforma SaaS Multi-Tenant de Auditoria Logística (FlashCash Log). Remova funcionalidades desnecessárias e foque 100% na automação do faturamento via canhoto.
+
+1. Arquitetura de Dados (Multi-Empresa)
+
+Implemente PostgreSQL com suporte a múltiplas empresas. Cada tabela deve ter um company_id.
+
+Crie três níveis de acesso:
+
+Super Admin (Ailton): Painel mestre para gerenciar todas as transportadoras, bloquear/desbloquear acesso e resetar senhas.
+
+Admin da Transportadora (Secretária/Dono): Gestão de motoristas, clientes e aprovação de faturamento.
+
+Motorista (Mobile): Acesso simplificado via 'Link Mágico' (Token na URL) sem necessidade de login/senha.
+
+2. Fluxo do Motorista (Foco em Fiorino/Doblò)
+
+Interface de lista de entregas do dia.
+
+Ao capturar a foto, force a captura de GPS (Latitude/Longitude) e Timestamp.
+
+Validação por IA: Use tesseract.js para validar se a foto contém texto (evitar fotos de parede/volante). Se a imagem estiver borrada ou sem dados, exiba alerta de erro e peça nova foto.
+
+3. Painel de Conferência (O "Cérebro" do Faturamento)
+
+Tela centralizada para a secretária ver os canhotos que chegam em tempo real.
+
+Exiba a Foto do Canhoto lado a lado com um Mapa (Leaflet ou Google Maps) mostrando onde a foto foi tirada.
+
+Margem para Erro (Correção Manual): Permita que a secretária edite o número da nota, o nome do cliente ou o e-mail caso o motorista tenha selecionado errado.
+
+Botão 'Aprovar e Enviar': Gera um PDF profissional com a foto, selo de auditoria e mapa, enviando automaticamente via SMTP (Nodemailer) para o e-mail do financeiro do cliente final.
+
+4. Central do Dono (Super Admin Ailton)
+
+Rota /super-admin para controle total.
+
+Dashboard mostrando: Total de empresas ativas, volume de fotos processadas e status de faturamento de cada cliente.
+
+Função de 'Impersonate' (Logar como a empresa) para dar suporte técnico rápido.
+
+5. Interface e UX
+
+Design moderno, limpo (estilo Dashboard corporativo), usando Tailwind CSS.
+
+Transforme o frontend em PWA para o motorista instalar o ícone na tela do celular.
+
+Remova qualquer menu de 'redes sociais' ou 'chat' que não seja o suporte direto."

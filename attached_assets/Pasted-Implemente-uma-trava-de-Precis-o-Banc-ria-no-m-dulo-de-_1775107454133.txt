@@ -1,0 +1,33 @@
+Implemente uma trava de Precisão Bancária no módulo de captura de imagem do Opmax. O sistema deve funcionar como um leitor de boletos:
+
+1. Filtro de Captura (Overlay):
+
+Na tela da câmera, desenhe um retângulo guia (moldura) centralizado. O usuário deve alinhar a Nota Fiscal dentro dessa moldura para garantir o foco.
+
+Adicione um aviso em tempo real: 'Aproxime a nota e mantenha o foco'.
+
+2. Extração de Dados Críticos (OCR):
+
+O sistema deve focar obrigatoriamente na leitura da Chave de Acesso (44 dígitos) e do QR Code.
+
+Regra de Validação: O botão 'Confirmar' só deve ser liberado se o sistema conseguir extrair e validar a estrutura da Chave de Acesso ou do CNPJ do emissor. Se a imagem estiver borrada, o sistema deve pedir para 'Tirar nova foto'.
+
+3. Tratamento de Erro e Edição:
+
+Se a IA ler e houver dúvida em algum caractere, destaque o campo em vermelho para a administradora conferir.
+
+Garanta que, após a leitura, os dados apareçam em um formulário limpo para 'Conferência Rápida' antes de salvar no faturamento.
+
+4. Performance:
+
+O processamento deve ser instantâneo. Use uma biblioteca de OCR robusta (como Tesseract.js ou integração com Google Vision) para garantir que a leitura seja exata, sem 'alucinações' da IA."
+
+Como garantir que a foto saia legível:
+
+Para chegar no nível de banco que você quer, aqui estão 3 dicas técnicas para o comportamento do software:
+
+Auto-Focus e Lanterna: Peça ao Replit para ativar o foco automático da câmera do celular e, se possível, um botão de "Ligar Lanterna" dentro do app para lugares escuros (como cabines de caminhão ou galpões).
+
+Processamento de Imagem: O software deve converter a foto para Preto e Branco internamente antes de ler. Isso aumenta a precisão da IA em quase 90%, pois remove sombras e reflexos do papel da nota.
+
+Check de Dígito Verificador: A Chave de Acesso da NF tem um cálculo matemático no último dígito. O sistema de banco usa isso. Se a IA ler um número errado, o cálculo não bate e o sistema avisa na hora: "Número da nota inválido, verifique a foto

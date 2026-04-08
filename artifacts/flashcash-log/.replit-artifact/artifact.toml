@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Techsin"
+version = "1.0.0"
+id = "artifacts/flashcash-log"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 19806
+
+[services.development]
+run = "pnpm --filter @workspace/flashcash-log run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/flashcash-log", "run", "build" ]
+publicDir = "artifacts/flashcash-log/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "19806"
+BASE_PATH = "/"

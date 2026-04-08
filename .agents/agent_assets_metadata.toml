@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "8KuBbfwquR2jmyEBA36nL"
+uri = "file://techsin_backup.tar.gz"
+type = "unspecified"
+title = "TechSin — Backup completo do código"

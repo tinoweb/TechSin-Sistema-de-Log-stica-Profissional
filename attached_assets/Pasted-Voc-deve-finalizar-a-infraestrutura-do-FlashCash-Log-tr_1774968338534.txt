@@ -1,0 +1,35 @@
+Você deve finalizar a infraestrutura do FlashCash Log transformando-o em um protótipo funcional de alta fidelidade para venda B2B. O sistema deve ser sério, corporativo e totalmente interativo.
+
+1. SIMULAÇÃO REAL DO MOTORISTA (CÂMERA ATIVA):
+
+Na página do motorista, o botão 'Escanear Canhoto' deve abrir a câmera real do dispositivo (usando navigator.mediaDevices.getUserMedia).
+
+Adicione um 'overlay' (moldura) na câmera para ajudar o motorista a enquadrar o papel.
+
+Ao 'bater a foto', exiba uma animação de 'Análise de IA' (barra de progresso com texto: 'Extraindo dados da nota...', 'Verificando assinatura...', 'Validando GPS...').
+
+Após 3 segundos, mostre um modal de 'Sucesso': 'Entrega Validada e Conciliada com Nota Fiscal #12345'.
+
+2. CONCILIAÇÃO E DASHBOARD EXECUTIVO:
+
+No Dashboard do Dono, os gráficos (Recharts) devem ser interativos. Ao passar o mouse, mostre os valores.
+
+Crie uma tabela de 'Entregas Recentes' onde cada linha tem um status: 'Aguardando', 'Validado pela IA' ou 'Faturado'.
+
+Botão Antecipar: Ative o botão 'Antecipar Recebível'. Ao clicar, abra um modal elegante: 'Deseja antecipar R$ [Valor] para sua conta agora? Taxa de 1.5% aplicada'. Ao confirmar, mostre uma animação de dinheiro sendo transferido e atualize o gráfico de 'Liquidez Disponível' em tempo real na tela.
+
+3. FLUXO DE CONCILIAÇÃO XML:
+
+Simule a área de 'Upload de Manifesto'. Quando eu clicar em 'Simular Upload', o sistema deve 'povoar' a lista de viagens com dados fictícios de transportes (Destinatário, Valor, NF).
+
+Quando o motorista (na outra tela) 'enviar' o canhoto, essa lista no Dashboard do Dono deve atualizar o status automaticamente para 'Verificado' (Use estados globais ou simule com localStorage).
+
+4. INFRAESTRUTURA E UX REFINADA:
+
+Melhore a navegação: as páginas (Dashboard, Financeiro, Motoristas, Configurações) devem carregar instantaneamente sem recarregar a aba do navegador (Single Page Application).
+
+Use uma tipografia profissional (Inter) com pesos diferentes para hierarquia (Negrito para valores financeiros, regular para legendas).
+
+Garanta que o design seja 100% Responsivo: O dono vê um sistema robusto no PC e o motorista vê um app fluido no celular.
+
+OBJETIVO FINAL: Eu preciso conseguir abrir o app, 'subir' uma nota fake, ir na tela do motorista, abrir minha câmera, tirar uma foto de qualquer papel, e voltar no dashboard para ver o gráfico de 'Dinheiro Liberado' subindo. Tudo em Português do Brasil."

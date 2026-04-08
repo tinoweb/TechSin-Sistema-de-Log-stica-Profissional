@@ -1,0 +1,46 @@
+Refaça a arquitetura e a integração total do sistema seguindo este fluxo automatizado e conectado. O objetivo é erro zero e integração absoluta entre os módulos:
+
+1. Ingestão Inteligente (Upload XML/Imagens):
+Ao subir qualquer arquivo (XML, PDF, JPG, PNG) no módulo 'Upload', o sistema deve:
+
+Usar as melhores APIs de Visão Computacional e OCR para extrair: Valor, CNPJ, Data, Endereço e Chave de Acesso.
+
+Criar automaticamente um registro único (ID) no banco de dados.
+
+Alimentar instantaneamente o Dashboard Executivo (Faturamento Previsto) e a Fila de Conferência com status 'Pendente'.
+
+2. Conectividade da Fila de Operações:
+
+Cada nota carregada deve gerar uma 'Viagem' vinculada.
+
+Na Fila de Conferência, os dados devem estar prontos para conferência. Assim que o motorista enviar o canhoto, o sistema deve liberar as ações de 'Aprovar' e 'Editar' para o administrador.
+
+3. App do Motorista (Interface Simplificada):
+
+Ao acessar o link da entrega, o motorista deve ter apenas um botão de 'Tirar Foto do Canhoto'.
+
+Ação Pós-Envio: Assim que a foto for carregada com sucesso, o app deve exibir apenas a mensagem centralizada 'CONCLUÍDO' e encerrar a sessão/limpar a tela. Nada de menus complexos para o motorista.
+
+4. Integração de Canhotos AI e Faturamento:
+
+A foto enviada pelo motorista deve ser anexada automaticamente ao ID da nota original no Canhotos AI.
+
+O status na Fila de Conferência deve mudar para 'Aguardando Aprovação'.
+
+5. Fechamento e E-mail Expresso:
+
+Ao clicar em 'Aprovar' na Fila, o sistema deve:
+
+Mover o registro para o Arquivo de Operações.
+
+Atualizar o módulo de Faturamento (Faturamento Realizado).
+
+Disparar automaticamente um E-mail Expresso de Cobrança para o cliente vinculado, contendo o valor e a confirmação da entrega.
+
+6. Robustez Técnica:
+
+Use blocos try-except em todas as integrações de API para que o sistema nunca trave. Se a extração falhar, salve o arquivo e marque como 'Revisão Manual'.
+
+Garanta que o banco de dados relacional conecte corretamente: Cliente -> Nota -> Viagem -> Motorista -> Canhoto.
+
+Aplique as mudanças e realize o Deploy imediato da versão atualizada.

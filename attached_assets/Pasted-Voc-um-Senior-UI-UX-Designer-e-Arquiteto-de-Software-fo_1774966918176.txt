@@ -1,0 +1,51 @@
+Você é um Senior UI/UX Designer e Arquiteto de Software focado no mercado B2B SaaS de Alto Padrão. O projeto atual, o FlashCash Log, está com uma aparência muito 'gamificada' e pouco profissional (como visto em image_0.png). O objetivo é reestruturar o visual e as funcionalidades cruciais para parecer um sistema financeiro/logístico sério e robusto.
+
+FASE 1: REESTRUTURAÇÃO VISUAL (SERIEDADE CORPORATIVA)
+
+Paleta de Cores de Sistema: Substitua o visual neon. Use uma paleta corporativa sóbria:
+
+Fundo Primário: Grafite muito profundo #1A1A1A.
+
+Fundo Secundário (Navegação/Cards): Cinza Sombrio #262626.
+
+Tipografia Primária: Branco Gelo #F2F2F2.
+
+Cor de Destaque (Ações/Ponto de Luz): Azul Safira #3C82F6 (saturado, mas elegante). Use gradientes sutis #2563EB para #3C82F6.
+
+Cor de Sucesso (Dinheiro/Aprovação): Verde Floresta Claro #4ADE80.
+
+Layout & Tipografia:
+
+Tipografia: Use a fonte Inter ou Roboto (moderna e legível).
+
+Espaçamento: Aumente o padding interno dos cards e containers. O design deve respirar e ser simétrico.
+
+Borda: Use raios de borda suaves (ex: 8px ou 12px), não muito arredondados.
+
+Navegação Lateral: Torne os itens da lista (War Room, Faturamento, etc.) mais refinados, com espaçamento regular. O item ativo deve ter um hover azul safira sutil, não uma borda roxa agressiva.
+
+O termo 'War Room' deve ser mais discreto, talvez como um subtítulo. O título principal deve ser algo como 'Dashboard Executivo Logístico'.
+
+Refinamento do Logo: O logo 'FC' deve ser um ícone mais limpo e profissional, não neon. Use um gradiente azul safira sutil sobre um fundo cinza #262626.
+
+FASE 2: CONSERTAR NAVEGAÇÃO & SIMULAÇÕES ATIVAS
+
+Navegação Dinâmica: Assegure-se de que ao clicar nos itens do menu (Faturamento, Canhotos AI, etc.), a URL ou o conteúdo da página principal mude corretamente. Use rotas (se estiver usando React, use react-router-dom) para carregar os componentes correspondentes.
+
+Simulador de Canhotos (O Pulo do Gato): Crie uma seção/página inteira para 'Canhotos AI' que seja interativa.
+
+Crie um fluxo de simulação: Upload de Imagem (Input de Arquivo) -> Processamento (Simular Barra de Carregamento 3s) -> Exibição de Resultados.
+
+Após a simulação, exiba um card com os dados 'fictícios' extraídos (ex: Nota Fiscal: 12345, CNPJ: 12.345.678/0001-90, Status: Assinatura Validada, Coordenadas GPS: -23.5505, -46.6333).
+
+Simulador de Upload XML: Crie uma interface simples para 'Upload XML'. Ao subir um arquivo de teste (simule), mostre um card com o Valor do Frete (R$) e o Cliente Destinatário extraídos.
+
+Dashboards Vivos: Atualize os cards de 'Liquidez Disponível' e 'Capital em Trânsito'. Não use números neon gigantes. Use uma fonte de tamanho regular e coloque um micro-indicador de tendência (seta verde para cima, por exemplo) para dar vida aos dados.
+
+FASE 3: TOQUE FINAL 'NÍVEL EUA'
+
+Adicione um seletor de fuso horário e moeda visível no topo da 'War Room' para parecer um sistema que roda em escala global.
+
+Certifique-se de que o rodapé da navegação lateral (image_0.png) esteja limpo e o botão 'Sair' seja funcional (redirecione para uma página de login simples).
+
+CONSIDERAÇÕES DE DEMO: Como estamos no ambiente Demo, priorize a reestruturação visual de todas as telas visíveis e a simulação de fluxo para 'Canhotos AI' e 'Upload XML'. O resto pode ter dados estáticos."

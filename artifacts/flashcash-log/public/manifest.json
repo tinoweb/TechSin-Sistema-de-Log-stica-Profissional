@@ -1,0 +1,30 @@
+{
+  "name": "TechSin",
+  "short_name": "TechSin",
+  "description": "Sistema de Logística Profissional e Faturamento em tempo real para transportadoras brasileiras.",
+  "start_url": "https://www.techsin.com.br/motorista-app",
+  "scope": "https://www.techsin.com.br/",
+  "display": "standalone",
+  "background_color": "#0D0D0D",
+  "theme_color": "#1D4ED8",
+  "orientation": "portrait",
+  "lang": "pt-BR",
+  "dir": "ltr",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' rx='24' fill='%231D4ED8'/><text x='96' y='130' text-anchor='middle' font-size='72' font-weight='bold' fill='white' font-family='Arial'>TS</text></svg>",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='64' fill='%231D4ED8'/><text x='256' y='340' text-anchor='middle' font-size='192' font-weight='bold' fill='white' font-family='Arial'>TS</text></svg>",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "categories": ["business", "productivity"],
+  "related_applications": [],
+  "prefer_related_applications": false
+}

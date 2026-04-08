@@ -1,0 +1,31 @@
+Configure o banco de dados PostgreSQL para uma estrutura Multi-Tenant (Multi-Empresa). Crie uma tabela companies (id, nome, cnpj, email_financeiro, plano_ativo). Adicione uma coluna company_id em todas as outras tabelas (users, deliveries, drivers, receipts). Garanta que, ao fazer login, o usuário administrativo só consiga visualizar e gerenciar dados pertencentes ao seu company_id. Implemente a lógica de que cada transportadora tenha seu próprio subdomínio ou identificador único."
+
+Passo 2: O Painel do Ailton (Super Admin)
+
+Aqui é onde você terá o controle total sobre quem paga e quem usa o sistema.
+
+Prompt: "Crie uma rota protegida /super-admin que apenas eu (o dono do SaaS) possa acessar. Nesta tela, preciso de um Dashboard com: 1. Lista de todas as transportadoras cadastradas; 2. Botão para cadastrar nova transportadora; 3. Status de pagamento (Ativo/Bloqueado); 4. Botão para 'Resetar Senha' de qualquer empresa; 5. Contador total de canhotos digitalizados em toda a plataforma para eu acompanhar o crescimento."
+
+Passo 3: O Link Mágico do Motorista (Sem Senha)
+
+Isso resolve o problema do motorista que esquece a senha ou acha difícil usar o app.
+
+Prompt: "Desenvolva o sistema de 'Magic Link' para motoristas. Cada motorista deve ter um token único e permanente (ex: /drive/token-xyz-123). Ao acessar esse link pelo celular, o motorista deve entrar direto na sua 'Lista de Entregas do Dia' sem precisar digitar login ou senha. A interface deve ser ultra-simples: uma lista de endereços, um botão 'Câmera' para cada entrega e um status de 'Enviado'. Use PWA (Progressive Web App) para que o motorista possa adicionar um ícone do sistema na tela inicial do celular."
+
+Passo 4: IA de Validação de Imagem e GPS (O Coração do Negócio)
+
+Este é o diferencial que mata o WhatsApp.
+
+Prompt: "Implemente uma lógica de validação de captura: 1. No momento da foto, capture obrigatoriamente as coordenadas de GPS do motorista; 2. Antes de salvar, use uma biblioteca de processamento de imagem (como Tesseract.js ou similar) para verificar se existe texto na imagem (para evitar fotos de parede, volante ou papel em branco). Se a foto estiver borrada ou sem texto detectado, mostre um alerta vermelho: 'IMAGEM INVÁLIDA: Por favor, tire uma foto nítida do canhoto assinado para liberar a entrega'."
+
+Passo 5: Geração de PDF Auditado e Envio de E-mail Automático
+
+Este é o momento em que a transportadora fatura o frete.
+
+Prompt: "Crie a funcionalidade de 'Liberação de Faturamento': 1. No painel da transportadora, crie uma lista de 'Canhotos Pendentes'; 2. Ao clicar em 'Aprovar e Enviar', o sistema deve gerar um PDF contendo: a foto do canhoto, a data/hora exata, o mapa de localização (GPS) e um carimbo de 'AUDITADO POR FLASHCASH LOG'; 3. Dispare este PDF automaticamente via e-mail (usando Nodemailer/SMTP) para o e-mail do cliente cadastrado na nota, com um texto profissional de faturamento."
+
+Passo 6: Painel de Exceções e Suporte
+
+Para você e a secretária saberem o que deu errado.
+
+Prompt: "Crie uma aba 'Exceções' no painel administrativo da transportadora. Lá devem aparecer todos os canhotos que a IA rejeitou ou que foram batidos fora do raio de GPS do cliente. Adicione também um botão flutuante de 'Suporte via WhatsApp' que direcione o usuário direto para o meu número caso eles precisem de ajuda ou reset de senha.

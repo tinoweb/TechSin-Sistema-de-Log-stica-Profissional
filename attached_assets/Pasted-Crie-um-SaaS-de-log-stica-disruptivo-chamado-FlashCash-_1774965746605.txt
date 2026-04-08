@@ -1,0 +1,45 @@
+Crie um SaaS de logística disruptivo chamado FlashCash Log. O objetivo central é transformar canhotos de entrega em dinheiro imediato no caixa da transportadora, eliminando a burocracia manual e o atraso de faturamento.
+
+DIRETRIZES DE DESIGN & UX (NÍVEL VALE DO SILÍCIO):
+
+Interface: Dark Mode 'Cyber-Logistics' (Fundo grafite profundo #121212, cards com bordas arredondadas e sombras suaves).
+
+Cores de Destaque: Roxo Neon para ações principais e Verde Elétrico para status de 'Dinheiro Liberado'. Use a fonte 'Inter'.
+
+Dashboard: O painel do dono deve parecer uma 'War Room' financeira, com gráficos neon limpos e micro-interações elegantes.
+
+ARQUITETURA DO SISTEMA (3 PILARES):
+
+1. Painel do Motorista (PWA Mobile-First):
+
+UX Ultra-Simples: Apenas um card visível com a 'Entrega Atual' e um botão flutuante gigante: 'Escanear Canhoto'.
+
+Scanner com IA: Simule a integração de OCR que detecta automaticamente a Nota Fiscal, lê o CNPJ e valida se há uma assinatura no papel.
+
+Auditoria de Fé Pública: O sistema deve capturar automaticamente as coordenadas GPS (Latitude/Longitude) e o Timestamp (Data/Hora) no momento da foto, gerando um 'Selo de Autenticidade Digital' único para aquele documento.
+
+2. Painel do Dono da Transportadora (Intelligence Dashboard):
+
+Gestão de XML: Área de drag-and-drop para subir arquivos XML de CT-e/Manifesto. O sistema deve extrair o valor do frete e o cliente final.
+
+Match de Dados (Conciliação): O sistema deve cruzar automaticamente o XML com a foto enviada pelo motorista. Se os dados baterem e o GPS estiver correto, o status muda para 'Pronto para Faturamento'.
+
+Visão Data Science: Exiba um gráfico de 'Cash-in-Transit' (Dinheiro na Estrada) vs 'Cash-Ready' (Dinheiro Validado pela IA pronto para cair na conta).
+
+3. Módulo de Automação de Cobrança (A Máquina de Dinheiro):
+
+Gatilho Automático: Assim que a IA valida o canhoto, o sistema deve simular o envio de um 'Kit de Faturamento' (PDF da Fatura + Foto do Canhoto Auditada) para o e-mail do financeiro do cliente final.
+
+Botão de Antecipação: Inclua um botão de destaque: 'Antecipar Recebível agora (Taxa 1.5%)' para simular a funcionalidade de banco digital.
+
+STACK TECNOLÓGICA:
+
+Frontend: React.js com Tailwind CSS (para o visual premium).
+
+Backend: Python (FastAPI) ou Node.js.
+
+Banco de Dados: PostgreSQL (relacionando Transportadora, Clientes, Motoristas e Viagens).
+
+Gráficos: Recharts ou Chart.js com gradientes neon.
+
+Crie uma estrutura de pastas organizada e um banco de dados robusto. O foco é: Simplicidade para o motorista, Poder e Lucro para o dono.

@@ -1,0 +1,14 @@
+node_modules
+**/node_modules
+.git
+.gitignore
+.vscode
+.cache
+.local
+dist
+**/dist
+attached_assets
+techsin_backup.tar.gz
+.env
+.env.*
+!.env.example

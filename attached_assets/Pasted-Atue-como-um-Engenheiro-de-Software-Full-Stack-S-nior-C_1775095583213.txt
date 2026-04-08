@@ -1,0 +1,49 @@
+Atue como um Engenheiro de Software Full-Stack Sênior. Construa o SaaS FlashCash Log (focado em transporte de carga leve/Fiorino) utilizando React no frontend e Node.js/Express no backend com banco de dados PostgreSQL (via Prisma ou Drizzle).
+
+1. ARQUITETURA MULTI-TENANT (SaaS)
+
+Implemente uma estrutura onde cada Transportadora (Company) tenha seus próprios dados.
+
+Níveis de Acesso:
+
+Master Admin: Painel secreto para o Ailton gerir as assinaturas das transportadoras.
+
+Admin (Bruna): Painel da transportadora para importar notas, monitorar motoristas e aprovar faturamento.
+
+PWA Motorista: Interface mobile-first (sem login, via link único por entrega) para bater foto e coletar GPS.
+
+2. INTELIGÊNCIA DE ENTRADA (MÓDULO ERP/XML)
+
+Crie um componente de upload que aceite arquivos XML (NF-e).
+
+O sistema deve extrair automaticamente: Chave da NF, Número da Nota, Valor, Nome do Destinatário, Endereço de Entrega e E-mail do Financeiro do cliente.
+
+Crie um Endpoint de API (/api/v1/sync-invoice) documentado para integração direta com ERPs externos (Totvs, Bling, etc.).
+
+3. ENGINE DE AUDITORIA (APP DO MOTORISTA)
+
+Trava de Qualidade (OCR): Integre tesseract.js. O sistema deve ler a foto tirada pelo motorista. Se não detectar texto (ex: foto de pneu ou volante), deve exibir erro: 'Documento não identificado. Foque no canhoto'.
+
+Cerca Virtual (Geofencing): O sistema deve capturar a coordenada GPS no momento da foto e comparar com a latitude/longitude do endereço extraído do XML. Se a distância for superior a 500 metros, marque a entrega como 'ALERTA DE FRAUDE' no painel.
+
+Auto-Capture: Implemente uma interface de câmera que ajude o motorista a enquadrar o papel.
+
+4. FLUXO DE FATURAMENTO (PAINEL DA BRUNA)
+
+Liste as entregas com status: 'Pendente', 'Aguardando Auditoria' e 'Faturado'.
+
+Ao clicar em uma entrega auditada, gere um PDF de Comprovante de Entrega Profissional contendo:
+
+Foto do canhoto.
+
+Mapa com o ponto exato da entrega (Google Maps Static API).
+
+Data, hora e IP do dispositivo.
+
+Adicione um botão 'Enviar p/ Cliente' que dispara este PDF automaticamente para o e-mail extraído do XML.
+
+5. DESIGN E INTERFACE
+
+Use Tailwind CSS com um tema profissional (Cores: Azul Marinho, Branco e Cinza).
+
+O Dashboard deve mostrar o 'Lucro Recuperado' (estimativa de notas que seriam perdidas sem a auditoria)."

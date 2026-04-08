@@ -1,0 +1,49 @@
+Atue como Engenheiro de Software Full-Stack Sênior. Desenvolva uma plataforma SaaS Multi-Tenant de Auditoria e Faturamento Logístico chamada FlashCash Log. O foco absoluto é transformar fotos de canhotos em faturamento auditado com zero atrito.
+
+1. ARQUITETURA MULTI-TENANT (POSTGRESQL)
+
+Estruture o banco de dados com a coluna company_id em todas as tabelas: users, drivers, deliveries, customers, receipts.
+
+Crie três níveis de autenticação:
+
+SUPER ADMIN (Ailton): Rota /super-admin. Dashboard para gerenciar transportadoras (Criar, Bloquear, Resetar Senhas) e ver métricas globais.
+
+ADMIN TRANSPORTADORA (Secretária/Dono): Dashboard de gestão de entregas, motoristas e conferência de canhotos.
+
+MOTORISTA (PWA): Acesso via 'Magic Link' único por motorista (/drive/[token]). Sem login/senha.
+
+2. INTERFACE DO MOTORISTA (EXPERIÊNCIA DE BANCO)
+
+Desenvolva uma lista de entregas pendentes ultra-simples.
+
+Scanner Inteligente: Ao abrir a câmera, implemente uma lógica de auto-capture (usando tesseract.js ou detecção de bordas/nitidez). O sistema deve bater a foto automaticamente quando a imagem estiver estável e com texto detectado.
+
+Auditoria Obrigatória: Capture automaticamente GPS (Lat/Long) e Timestamp no momento exato do clique.
+
+Feedback Visual: Use sons (Bip de sucesso) e alertas de 'Imagem Borrada' ou 'Foque no Canhoto'.
+
+3. PAINEL DE CONFERÊNCIA E MARGEM DE ERRO
+
+A secretária deve ver uma fila de 'Canhotos para Aprovação'.
+
+Visualização Lado a Lado: Mostre a foto do canhoto e um mapa (Leaflet/Google Maps) com o 'Pin' do GPS capturado.
+
+Edição Manual: Permita que a secretária corrija manualmente o número da nota, o cliente ou o e-mail de destino antes da aprovação final, caso o motorista tenha cometido um erro de seleção.
+
+4. AUTOMAÇÃO DE FATURAMENTO (O BOTÃO DO DINHEIRO)
+
+Botão 'Aprovar e Enviar':
+
+Gera um PDF profissional com: Logo da empresa, Foto do Canhoto, Selo de Auditoria Digital (Data/Hora/GPS) e Link do Mapa.
+
+Dispara automaticamente via SMTP (Nodemailer) para o e-mail do financeiro do cliente final.
+
+Altera o status para 'Faturado/Concluído'.
+
+5. DESIGN E TECNOLOGIAS
+
+Frontend: React ou Next.js com Tailwind CSS (Estilo corporativo, limpo e dark/light mode).
+
+Mobile: Mobile-first, transformando em PWA para o motorista salvar na tela inicial.
+
+Segurança: Bloqueio de acesso por inadimplência controlado pelo Super Admin.

@@ -1,0 +1,1158 @@
+openapi: 3.1.0
+info:
+  title: Api
+  version: 0.1.0
+  description: FlashCash Log API specification
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: transportadoras
+    description: Transportation company operations
+  - name: motoristas
+    description: Driver operations
+  - name: clientes
+    description: Client operations
+  - name: viagens
+    description: Trip/delivery operations
+  - name: canhotos
+    description: Delivery receipt (canhoto) operations
+  - name: xmls
+    description: XML CT-e/Manifesto operations
+  - name: faturas
+    description: Invoice/billing operations
+  - name: dashboard
+    description: Dashboard analytics operations
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /transportadoras:
+    get:
+      operationId: listTransportadoras
+      tags: [transportadoras]
+      summary: List all transportation companies
+      responses:
+        "200":
+          description: List of companies
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Transportadora"
+    post:
+      operationId: createTransportadora
+      tags: [transportadoras]
+      summary: Create a transportation company
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTransportadoraInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Transportadora"
+
+  /transportadoras/{id}:
+    get:
+      operationId: getTransportadora
+      tags: [transportadoras]
+      summary: Get a transportation company by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Company details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Transportadora"
+
+  /motoristas:
+    get:
+      operationId: listMotoristas
+      tags: [motoristas]
+      summary: List all drivers
+      parameters:
+        - name: transportadoraId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of drivers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Motorista"
+    post:
+      operationId: createMotorista
+      tags: [motoristas]
+      summary: Create a driver
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateMotoristaInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Motorista"
+
+  /motoristas/{id}:
+    get:
+      operationId: getMotorista
+      tags: [motoristas]
+      summary: Get a driver by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Driver details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Motorista"
+
+  /clientes:
+    get:
+      operationId: listClientes
+      tags: [clientes]
+      summary: List all clients
+      parameters:
+        - name: transportadoraId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of clients
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Cliente"
+    post:
+      operationId: createCliente
+      tags: [clientes]
+      summary: Create a client
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateClienteInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Cliente"
+
+  /viagens:
+    get:
+      operationId: listViagens
+      tags: [viagens]
+      summary: List all trips
+      parameters:
+        - name: transportadoraId
+          in: query
+          schema:
+            type: integer
+        - name: motoristaId
+          in: query
+          schema:
+            type: integer
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pendente, em_transito, entregue, validado, faturado]
+      responses:
+        "200":
+          description: List of trips
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Viagem"
+    post:
+      operationId: createViagem
+      tags: [viagens]
+      summary: Create a trip
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateViagemInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Viagem"
+
+  /viagens/{id}:
+    get:
+      operationId: getViagem
+      tags: [viagens]
+      summary: Get a trip by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Trip details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Viagem"
+
+  /viagens/{id}/canhoto:
+    post:
+      operationId: submitCanhoto
+      tags: [canhotos]
+      summary: Submit delivery receipt (canhoto) for a trip
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmitCanhotoInput"
+      responses:
+        "200":
+          description: Canhoto submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Canhoto"
+
+  /canhotos:
+    get:
+      operationId: listCanhotos
+      tags: [canhotos]
+      summary: List all delivery receipts
+      parameters:
+        - name: transportadoraId
+          in: query
+          schema:
+            type: integer
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pendente, validado, rejeitado]
+      responses:
+        "200":
+          description: List of canhotos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Canhoto"
+
+  /canhotos/{id}:
+    get:
+      operationId: getCanhoto
+      tags: [canhotos]
+      summary: Get a canhoto by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Canhoto details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Canhoto"
+
+  /canhotos/{id}/validate:
+    post:
+      operationId: validateCanhoto
+      tags: [canhotos]
+      summary: Manually validate or reject a canhoto
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ValidateCanhotoInput"
+      responses:
+        "200":
+          description: Validation result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Canhoto"
+
+  /xmls:
+    get:
+      operationId: listXmls
+      tags: [xmls]
+      summary: List all XML uploads (CT-e/Manifesto)
+      parameters:
+        - name: transportadoraId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of XMLs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/XmlUpload"
+    post:
+      operationId: uploadXml
+      tags: [xmls]
+      summary: Upload XML CT-e or Manifesto
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UploadXmlInput"
+      responses:
+        "201":
+          description: XML uploaded and parsed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/XmlUpload"
+
+  /xmls/{id}/match:
+    post:
+      operationId: matchXmlCanhoto
+      tags: [xmls]
+      summary: Attempt to match XML with a canhoto photo
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Match result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/XmlMatchResult"
+
+  /faturas:
+    get:
+      operationId: listFaturas
+      tags: [faturas]
+      summary: List all invoices
+      parameters:
+        - name: transportadoraId
+          in: query
+          schema:
+            type: integer
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pendente, enviado, pago, antecipado]
+      responses:
+        "200":
+          description: List of invoices
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Fatura"
+    post:
+      operationId: createFatura
+      tags: [faturas]
+      summary: Create an invoice from validated canhoto
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateFaturaInput"
+      responses:
+        "201":
+          description: Invoice created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Fatura"
+
+  /faturas/{id}/enviar:
+    post:
+      operationId: enviarFatura
+      tags: [faturas]
+      summary: Send billing kit to client's finance email
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Billing kit sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Fatura"
+
+  /faturas/{id}/antecipar:
+    post:
+      operationId: anteciparFatura
+      tags: [faturas]
+      summary: Request receivables anticipation (1.5% fee)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Anticipation processed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Fatura"
+
+  /dashboard/summary:
+    get:
+      operationId: getDashboardSummary
+      tags: [dashboard]
+      summary: Get dashboard financial summary
+      parameters:
+        - name: transportadoraId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Dashboard summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+
+  /dashboard/cash-flow:
+    get:
+      operationId: getCashFlow
+      tags: [dashboard]
+      summary: Get cash-in-transit vs cash-ready chart data
+      parameters:
+        - name: transportadoraId
+          in: query
+          schema:
+            type: integer
+        - name: days
+          in: query
+          schema:
+            type: integer
+            default: 30
+      responses:
+        "200":
+          description: Cash flow data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CashFlowDataPoint"
+
+  /dashboard/recent-activity:
+    get:
+      operationId: getRecentActivity
+      tags: [dashboard]
+      summary: Get recent activity feed
+      parameters:
+        - name: transportadoraId
+          in: query
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Recent activity
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ActivityItem"
+
+  /dashboard/motorista/{id}:
+    get:
+      operationId: getMotoristaDashboard
+      tags: [dashboard]
+      summary: Get driver's current trip and stats
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Driver dashboard data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MotoristaDashboard"
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+
+    Transportadora:
+      type: object
+      properties:
+        id:
+          type: integer
+        nome:
+          type: string
+        cnpj:
+          type: string
+        email:
+          type: string
+        telefone:
+          type: string
+        emailFinanceiro:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - nome
+        - cnpj
+        - email
+
+    CreateTransportadoraInput:
+      type: object
+      properties:
+        nome:
+          type: string
+        cnpj:
+          type: string
+        email:
+          type: string
+        telefone:
+          type: string
+        emailFinanceiro:
+          type: string
+      required:
+        - nome
+        - cnpj
+        - email
+
+    Motorista:
+      type: object
+      properties:
+        id:
+          type: integer
+        transportadoraId:
+          type: integer
+        nome:
+          type: string
+        cpf:
+          type: string
+        telefone:
+          type: string
+        email:
+          type: string
+        cnh:
+          type: string
+        status:
+          type: string
+          enum: [ativo, inativo, em_rota]
+        totalEntregas:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - transportadoraId
+        - nome
+        - cpf
+        - status
+
+    CreateMotoristaInput:
+      type: object
+      properties:
+        transportadoraId:
+          type: integer
+        nome:
+          type: string
+        cpf:
+          type: string
+        telefone:
+          type: string
+        email:
+          type: string
+        cnh:
+          type: string
+      required:
+        - transportadoraId
+        - nome
+        - cpf
+
+    Cliente:
+      type: object
+      properties:
+        id:
+          type: integer
+        transportadoraId:
+          type: integer
+        nome:
+          type: string
+        cnpj:
+          type: string
+        email:
+          type: string
+        emailFinanceiro:
+          type: string
+        telefone:
+          type: string
+        endereco:
+          type: string
+        totalFaturas:
+          type: integer
+        valorTotal:
+          type: number
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - transportadoraId
+        - nome
+        - cnpj
+        - email
+
+    CreateClienteInput:
+      type: object
+      properties:
+        transportadoraId:
+          type: integer
+        nome:
+          type: string
+        cnpj:
+          type: string
+        email:
+          type: string
+        emailFinanceiro:
+          type: string
+        telefone:
+          type: string
+        endereco:
+          type: string
+      required:
+        - transportadoraId
+        - nome
+        - cnpj
+        - email
+
+    Viagem:
+      type: object
+      properties:
+        id:
+          type: integer
+        transportadoraId:
+          type: integer
+        motoristaId:
+          type: integer
+        clienteId:
+          type: integer
+        motoristaNome:
+          type: string
+        clienteNome:
+          type: string
+        numeroNF:
+          type: string
+        valorFrete:
+          type: number
+        origem:
+          type: string
+        destino:
+          type: string
+        status:
+          type: string
+          enum: [pendente, em_transito, entregue, validado, faturado]
+        dataPartida:
+          type: string
+          format: date-time
+        dataEntrega:
+          type: string
+          format: date-time
+        canhotoId:
+          type: integer
+        xmlId:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - transportadoraId
+        - motoristaId
+        - clienteId
+        - status
+        - valorFrete
+
+    CreateViagemInput:
+      type: object
+      properties:
+        transportadoraId:
+          type: integer
+        motoristaId:
+          type: integer
+        clienteId:
+          type: integer
+        numeroNF:
+          type: string
+        valorFrete:
+          type: number
+        origem:
+          type: string
+        destino:
+          type: string
+        dataPartida:
+          type: string
+          format: date-time
+      required:
+        - transportadoraId
+        - motoristaId
+        - clienteId
+        - valorFrete
+
+    Canhoto:
+      type: object
+      properties:
+        id:
+          type: integer
+        viagemId:
+          type: integer
+        motoristaId:
+          type: integer
+        fotoUrl:
+          type: string
+        latitude:
+          type: number
+        longitude:
+          type: number
+        timestamp:
+          type: string
+          format: date-time
+        numeroCte:
+          type: string
+        cnpjCliente:
+          type: string
+        numeroNF:
+          type: string
+        valorDetectado:
+          type: number
+        assinaturaDetectada:
+          type: boolean
+        sealId:
+          type: string
+        status:
+          type: string
+          enum: [pendente, validado, rejeitado]
+        iaConfidencia:
+          type: number
+        observacoes:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - viagemId
+        - motoristaId
+        - status
+        - timestamp
+
+    SubmitCanhotoInput:
+      type: object
+      properties:
+        fotoUrl:
+          type: string
+        latitude:
+          type: number
+        longitude:
+          type: number
+        numeroCte:
+          type: string
+        cnpjCliente:
+          type: string
+        numeroNF:
+          type: string
+        valorDetectado:
+          type: number
+        assinaturaDetectada:
+          type: boolean
+      required:
+        - fotoUrl
+        - latitude
+        - longitude
+
+    ValidateCanhotoInput:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [validado, rejeitado]
+        observacoes:
+          type: string
+      required:
+        - status
+
+    XmlUpload:
+      type: object
+      properties:
+        id:
+          type: integer
+        transportadoraId:
+          type: integer
+        tipo:
+          type: string
+          enum: [cte, manifesto]
+        numeroCte:
+          type: string
+        cnpjEmissor:
+          type: string
+        cnpjDestinatario:
+          type: string
+        nomeDestinatario:
+          type: string
+        valorFrete:
+          type: number
+        dataEmissao:
+          type: string
+          format: date-time
+        xmlContent:
+          type: string
+        status:
+          type: string
+          enum: [processando, conciliado, pendente, erro]
+        canhotoId:
+          type: integer
+        viagemId:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - transportadoraId
+        - tipo
+        - status
+
+    UploadXmlInput:
+      type: object
+      properties:
+        transportadoraId:
+          type: integer
+        tipo:
+          type: string
+          enum: [cte, manifesto]
+        xmlContent:
+          type: string
+        numeroCte:
+          type: string
+        cnpjEmissor:
+          type: string
+        cnpjDestinatario:
+          type: string
+        nomeDestinatario:
+          type: string
+        valorFrete:
+          type: number
+        dataEmissao:
+          type: string
+          format: date-time
+      required:
+        - transportadoraId
+        - tipo
+        - xmlContent
+
+    XmlMatchResult:
+      type: object
+      properties:
+        matched:
+          type: boolean
+        xmlId:
+          type: integer
+        canhotoId:
+          type: integer
+        viagemId:
+          type: integer
+        confidence:
+          type: number
+        details:
+          type: string
+        status:
+          type: string
+      required:
+        - matched
+        - xmlId
+
+    Fatura:
+      type: object
+      properties:
+        id:
+          type: integer
+        transportadoraId:
+          type: integer
+        clienteId:
+          type: integer
+        clienteNome:
+          type: string
+        clienteEmail:
+          type: string
+        viagemId:
+          type: integer
+        canhotoId:
+          type: integer
+        xmlId:
+          type: integer
+        numeroFatura:
+          type: string
+        valor:
+          type: number
+        valorAntecipado:
+          type: number
+        taxaAntecipacao:
+          type: number
+        status:
+          type: string
+          enum: [pendente, enviado, pago, antecipado]
+        dataEmissao:
+          type: string
+          format: date-time
+        dataVencimento:
+          type: string
+          format: date-time
+        dataPagamento:
+          type: string
+          format: date-time
+        kitEnviadoEm:
+          type: string
+          format: date-time
+        antecipacaoSolicitadaEm:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - transportadoraId
+        - clienteId
+        - viagemId
+        - valor
+        - status
+
+    CreateFaturaInput:
+      type: object
+      properties:
+        transportadoraId:
+          type: integer
+        clienteId:
+          type: integer
+        viagemId:
+          type: integer
+        canhotoId:
+          type: integer
+        xmlId:
+          type: integer
+        valor:
+          type: number
+        dataVencimento:
+          type: string
+          format: date-time
+      required:
+        - transportadoraId
+        - clienteId
+        - viagemId
+        - valor
+
+    DashboardSummary:
+      type: object
+      properties:
+        totalViagens:
+          type: integer
+        viagensEmTransito:
+          type: integer
+        canhotosPendentes:
+          type: integer
+        canhotosValidados:
+          type: integer
+        faturasEmAberto:
+          type: integer
+        valorEmTransito:
+          type: number
+        valorValidado:
+          type: number
+        valorFaturado:
+          type: number
+        valorAntecipado:
+          type: number
+        motoristasAtivos:
+          type: integer
+        xmlsPendentes:
+          type: integer
+        taxaValidacaoIA:
+          type: number
+        crescimentoMensal:
+          type: number
+      required:
+        - totalViagens
+        - viagensEmTransito
+        - canhotosPendentes
+        - canhotosValidados
+        - faturasEmAberto
+        - valorEmTransito
+        - valorValidado
+        - valorFaturado
+
+    CashFlowDataPoint:
+      type: object
+      properties:
+        data:
+          type: string
+        cashInTransit:
+          type: number
+        cashReady:
+          type: number
+        faturado:
+          type: number
+      required:
+        - data
+        - cashInTransit
+        - cashReady
+        - faturado
+
+    ActivityItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        tipo:
+          type: string
+          enum: [canhoto_enviado, canhoto_validado, fatura_criada, fatura_enviada, antecipacao, xml_upload, viagem_iniciada, viagem_concluida]
+        descricao:
+          type: string
+        entidade:
+          type: string
+        entidadeId:
+          type: integer
+        valor:
+          type: number
+        status:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+      required:
+        - id
+        - tipo
+        - descricao
+        - timestamp
+
+    MotoristaDashboard:
+      type: object
+      properties:
+        motorista:
+          $ref: "#/components/schemas/Motorista"
+        viagemAtual:
+          $ref: "#/components/schemas/Viagem"
+        totalEntregasHoje:
+          type: integer
+        totalEntregasMes:
+          type: integer
+        canhotosEnviados:
+          type: integer
+        canhotosValidados:
+          type: integer
+        valorGeradoMes:
+          type: number
+      required:
+        - motorista
+        - totalEntregasHoje
+        - totalEntregasMes
+        - canhotosEnviados
+        - canhotosValidados

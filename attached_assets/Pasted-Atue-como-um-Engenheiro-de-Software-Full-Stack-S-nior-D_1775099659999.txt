@@ -1,0 +1,45 @@
+Atue como um Engenheiro de Software Full-Stack Sênior. Desenvolva o sistema Opmax, uma plataforma SaaS real de Auditoria Logística e Faturamento Antecipado. O foco é eliminar a perda de canhotos e acelerar o caixa da transportadora.
+
+1. ARQUITETURA E PERSISTÊNCIA (SEM PERDA DE DADOS)
+
+Stack: React (Frontend), Node.js/Express (Backend), PostgreSQL com Prisma ORM (Database).
+
+Armazenamento Seguro: Configure o sistema para salvar as imagens dos canhotos de forma persistente (usando o Persistent Storage do Replit ou convertendo para Base64 no Banco de Dados). Os documentos não podem sumir após o restart do container.
+
+Remoção de Simulações: Delete todos os dados 'fake', bônus de motorista e limites de crédito fictícios. O sistema deve iniciar 'zerado' para uso real.
+
+2. PAINEL ADMINISTRATIVO (INTERFACE DA BRUNA)
+
+Leitor de XML (NF-e): Implemente um upload de XML que extraia automaticamente: Chave da Nota, Número, Valor, Destinatário, Endereço de Entrega e E-mail do cliente.
+
+Dashboard de Faturamento: Gráfico simples de 'Notas Auditadas' vs 'Notas Pendentes'. Mostre o valor total em Reais (R$) que está aguardando o canhoto para ser faturado.
+
+Gestão de Rotas: Botão 'Gerar Link do Motorista'. Este botão cria uma URL Única com Token (ex: /entrega/abc-123) que dá acesso direto às entregas vinculadas, sem necessidade de login ou senha para o motorista.
+
+3. MÓDULO DO MOTORISTA (PWA MOBILE-FIRST)
+
+Lista de Entregas: O motorista vê os endereços extraídos do XML, ordenados por proximidade (Geolocalização).
+
+Trava de Auditoria: Para cada entrega, o motorista deve obrigatoriamente:
+
+Tirar foto do canhoto (Integrar tesseract.js para validar se há texto na imagem antes de aceitar).
+
+O sistema deve capturar automaticamente a coordenada GPS e o Timestamp no momento exato do clique.
+
+Sincronização: Se o motorista estiver sem sinal, os dados (Foto + GPS) devem ser mantidos no cache e enviados assim que a conexão retornar.
+
+4. ARQUIVO E AUDITORIA (HISTÓRICO OPERACIONAL)
+
+Crie uma página de 'Arquivo de Operações' com busca por Número da Nota, Nome do Cliente ou Data.
+
+Cada registro deve exibir: XML Original, Foto do Canhoto, Mapa do GPS da entrega e Status (Aprovado/Alerta de Divergência).
+
+Alerta de Fraude: Se o GPS da foto divergir mais de 500m do endereço do XML, marque a nota com um ícone vermelho no painel da Bruna.
+
+5. DESIGN E USABILIDADE
+
+Nome: Opmax.
+
+Cores: Profissionais (Azul Marinho, Cinza Escuro e Branco).
+
+Interface limpa e objetiva para uso em ambiente de galpão e rua.
