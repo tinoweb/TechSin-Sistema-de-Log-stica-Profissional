@@ -112,6 +112,7 @@ export default function DriveApp() {
   const [aiProgress, setAiProgress] = useState(0);
   const [capturedFrame, setCapturedFrame] = useState<string | null>(null);
   const [cameraError, setCameraError] = useState(false);
+  const [cameraErrorMessage, setCameraErrorMessage] = useState<string>("Permissão negada ou dispositivo sem câmera.");
   const [sealId, setSealId] = useState("");
   const [completedNFs, setCompletedNFs] = useState<Set<number>>(new Set());
   const [ocrError, setOcrError] = useState<string | null>(null);
@@ -185,14 +186,35 @@ export default function DriveApp() {
   const openCamera = useCallback(async (viagem: Viagem) => {
     setScanTarget({ viagemId: viagem.id, nf: viagem.numeroNF ?? "—" });
     setCameraError(false);
+    setCameraErrorMessage("Permissão negada ou dispositivo sem câmera.");
     setScanState("camera");
+
+    if (!window.isSecureContext) {
+      setCameraError(true);
+      setCameraErrorMessage("A câmera exige conexão segura (HTTPS). Abra o app em https:// para capturar fotos.");
+      return;
+    }
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setCameraError(true);
+      setCameraErrorMessage("Este navegador/dispositivo não suporta acesso à câmera.");
+      return;
+    }
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } }
       });
       streamRef.current = stream;
       if (videoRef.current) { videoRef.current.srcObject = stream; videoRef.current.play(); }
-    } catch { setCameraError(true); }
+    } catch (err) {
+      setCameraError(true);
+      if (err instanceof DOMException && err.name === "NotAllowedError") {
+        setCameraErrorMessage("Permissão de câmera negada. Autorize o acesso nas configurações do navegador.");
+        return;
+      }
+      setCameraErrorMessage("Não foi possível abrir a câmera neste dispositivo.");
+    }
   }, []);
 
   const stopCamera = useCallback(() => {
@@ -518,7 +540,7 @@ export default function DriveApp() {
               <div className="text-center p-6">
                 <AlertTriangle className="w-10 h-10 text-amber-400 mx-auto mb-3" />
                 <p className="text-sm font-medium">Câmera não disponível</p>
-                <p className="text-xs text-muted-foreground mt-1">Permissão negada ou dispositivo sem câmera.</p>
+                <p className="text-xs text-muted-foreground mt-1">{cameraErrorMessage}</p>
               </div>
             </div>
           )}
