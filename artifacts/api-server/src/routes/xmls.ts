@@ -127,7 +127,7 @@ router.post("/xmls/ocr", async (req, res) => {
         dataEmissao,
         enderecoEntrega:  ocr.enderecoEntrega ?? null,
         chaveAcesso:      ocr.chaveAcesso ?? null,
-        status:           "pendente",
+        status:           "processando", // Mudança: processando em vez de pendente
       }).where(eq(xmlsTable.id, created.id));
 
       await db.update(viagensTable).set({

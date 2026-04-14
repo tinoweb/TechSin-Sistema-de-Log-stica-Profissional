@@ -58,7 +58,7 @@ router.get("/dashboard/summary", async (req, res) => {
       .filter(v => v.status !== "faturado")
       .reduce((s, v) => s + parseFloat(v.valorFrete as string || "0"), 0);
 
-    const xmlsPendentesCount = xmls.filter(x => x.status === "pendente").length;
+    const xmlsPendentesCount = xmls.filter(x => x.status === "pendente" || x.status === "processando").length;
     const xmlsValorPendente = xmls
       .filter(x => x.status === "pendente")
       .reduce((s, x) => s + parseFloat(x.valorFrete as string || "0"), 0);

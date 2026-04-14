@@ -70,13 +70,34 @@ export default function Motoristas() {
     });
   };
 
-  const openLink = (motorista: any) => {
-    const token = (motorista as any).magicToken;
-    const link = getMagicLink(token);
+  const openLink = async (motorista: any) => {
+    let token = (motorista as any).magicToken;
+    
+    // Se não tem token, gerar um novo
     if (!token) {
-      toast({ title: "Motorista sem link", description: "Este motorista não possui um Magic Link gerado.", variant: "destructive" });
-      return;
+      try {
+        const response = await fetch(`/api/motoristas/${motorista.id}/generate-token`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          token = data.magicToken;
+          // Atualizar cache local
+          queryClient.invalidateQueries({ queryKey: getListMotoristasQueryKey() });
+          toast({ title: "Link gerado!", description: `Token criado para ${motorista.nome}` });
+        } else {
+          toast({ title: "Erro ao gerar link", description: "Tente novamente.", variant: "destructive" });
+          return;
+        }
+      } catch (error) {
+        toast({ title: "Erro de conexão", description: "Verifique sua internet.", variant: "destructive" });
+        return;
+      }
     }
+    
+    const link = getMagicLink(token);
     setLinkModal({ nome: motorista.nome, link });
   };
 
