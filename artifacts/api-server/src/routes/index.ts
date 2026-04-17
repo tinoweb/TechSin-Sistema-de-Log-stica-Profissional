@@ -11,6 +11,7 @@ import faturasRouter from "./faturas";
 import dashboardRouter from "./dashboard";
 import superAdminRouter from "./super-admin";
 import erpSyncRouter from "./erp-sync";
+import testEmailRouter from "./test-email";
 
 const router: IRouter = Router();
 
@@ -26,5 +27,6 @@ router.use(canhotosRouter);
 router.use(xmlsRouter);
 router.use(faturasRouter);
 router.use(dashboardRouter);
+router.use(testEmailRouter);
 
 export default router;
