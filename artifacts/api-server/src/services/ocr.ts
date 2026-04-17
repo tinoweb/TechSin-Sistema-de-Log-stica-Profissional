@@ -1,11 +1,23 @@
 import OpenAI from "openai";
 import { logger } from "../lib/logger";
 
-/* ── Cliente OpenAI via Replit AI Integrations ──────────────────────── */
-const openai = new OpenAI({
-  baseURL: process.env["AI_INTEGRATIONS_OPENAI_BASE_URL"],
-  apiKey:  process.env["AI_INTEGRATIONS_OPENAI_API_KEY"] ?? "placeholder",
-});
+/* ── Cliente OpenAI via Replit AI Integrations ────────────────────────
+ * NOTA: O cliente é criado lazy dentro da função para garantir que
+ * as variáveis de ambiente estejam disponíveis no momento da execução.
+ * ────────────────────────────────────────────────────────────────── */
+function getOpenAIClient(): OpenAI {
+  const apiKey = process.env["AI_INTEGRATIONS_OPENAI_API_KEY"];
+  const baseURL = process.env["AI_INTEGRATIONS_OPENAI_BASE_URL"];
+  
+  if (!apiKey) {
+    throw new Error("AI_INTEGRATIONS_OPENAI_API_KEY não configurada");
+  }
+  
+  return new OpenAI({
+    baseURL: baseURL ?? "https://api.openai.com/v1",
+    apiKey: apiKey,
+  });
+}
 
 export interface OcrResult {
   valorTotal:       number | null;
@@ -42,6 +54,7 @@ Regras:
 
 export async function extractDocumentData(dataUrl: string): Promise<OcrResult> {
   try {
+    const openai = getOpenAIClient();
     const response = await openai.chat.completions.create({
       model: "gpt-4o",
       max_completion_tokens: 512,
