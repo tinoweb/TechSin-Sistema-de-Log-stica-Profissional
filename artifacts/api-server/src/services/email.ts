@@ -71,7 +71,7 @@ function buildEmailBody(p: EmailPayload): string {
     <p style="color:#374151;font-size:13px">Em caso de dúvidas, entre em contato com a transportadora.</p>
   </div>
   <div style="background:#f9fafb;padding:12px 24px;text-align:center">
-    <p style="color:#9ca3af;font-size:11px;margin:0">TechSin © 2026 — www.techsin.com.br</p>
+    <p style="color:#9ca3af;font-size:11px;margin:0">TechSin © 2026 — www.techsin.site</p>
   </div>
 </div></body></html>`;
 }
