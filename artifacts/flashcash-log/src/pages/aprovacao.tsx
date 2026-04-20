@@ -192,7 +192,8 @@ export default function Aprovacao() {
         api.get<Canhoto[]>("/canhotos?transportadoraId=1"),
         api.get<PendingViagem[]>("/viagens/pendentes-canhoto?transportadoraId=1").catch(() => [] as PendingViagem[]),
       ]);
-      setCanhotos(all.filter(c => c.status === "pendente" || c.status === "validado"));
+      // Fila mostra apenas pendentes — aprovados vão para Operações/Faturamento
+      setCanhotos(all.filter(c => c.status === "pendente"));
       setPendingViagens(pending);
     } catch (e: any) {
       toast({ title: "Erro ao carregar canhotos", description: e.message, variant: "destructive" });
