@@ -108,7 +108,14 @@ export default function Faturas() {
                   <TableCell>
                     <p className="text-xs font-mono font-semibold text-foreground">{formatCurrency(f.valor)}</p>
                     {f.status === "antecipado" && f.valorAntecipado && (
-                      <p className="text-[10px] text-success mt-0.5">Creditado: {formatCurrency(f.valorAntecipado)}</p>
+                      <div className="mt-0.5 space-y-0.5">
+                        <p className="text-[10px] text-success">
+                          Creditado: {formatCurrency(f.valorAntecipado)}
+                        </p>
+                        <p className="text-[9px] text-muted-foreground">
+                          Taxa antecipação: {f.taxaAntecipacao ? (f.taxaAntecipacao * 100).toFixed(1) : "1.5"}% (−{formatCurrency(f.valor - f.valorAntecipado)})
+                        </p>
+                      </div>
                     )}
                   </TableCell>
                   <TableCell className="text-xs font-mono text-muted-foreground">

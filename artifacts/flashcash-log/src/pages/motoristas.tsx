@@ -206,19 +206,15 @@ export default function Motoristas() {
                     <TableCell>{getStatusBadge(motorista.status)}</TableCell>
                     <TableCell className="text-right font-mono text-sm text-foreground">{(motorista as any).totalEntregas || 0}</TableCell>
                     <TableCell className="text-center">
-                      {(motorista as any).magicToken ? (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-7 text-[10px] border-primary/30 text-primary hover:bg-primary/8 px-2.5 gap-1"
-                          onClick={() => openLink(motorista)}
-                        >
-                          <Link2 className="w-3 h-3" />
-                          Gerar Link
-                        </Button>
-                      ) : (
-                        <span className="text-[10px] text-muted-foreground">Sem link</span>
-                      )}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-[10px] border-primary/30 text-primary hover:bg-primary/8 px-2.5 gap-1"
+                        onClick={() => openLink(motorista)}
+                      >
+                        <Link2 className="w-3 h-3" />
+                        {(motorista as any).magicToken ? "Enviar Link" : "Gerar Link"}
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))

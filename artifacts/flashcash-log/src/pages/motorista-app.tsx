@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   Camera, MapPin, CheckCircle2, ShieldCheck,
-  ChevronRight, X, Truck, AlertTriangle, Navigation
+  ChevronRight, X, Truck, AlertTriangle, Navigation, ArrowLeft
 } from "lucide-react";
 import { formatCurrency } from "@/lib/format";
 import { useFlashStore } from "@/lib/flash-store";
@@ -227,9 +227,22 @@ export default function MotoristaApp() {
 
       {/* Header */}
       <header className="px-5 py-4 border-b border-white/8 flex justify-between items-center" style={{ backgroundColor: "rgba(0,0,0,0.7)" }}>
-        <div>
-          <p className="text-[10px] text-muted-foreground uppercase tracking-widest">Motorista</p>
-          <p className="font-bold text-base">{dashboard?.motorista?.nome ?? "Aguardando login..."}</p>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            aria-label="Voltar"
+            className="w-9 h-9 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 transition-colors border border-white/10"
+            onClick={() => {
+              if (window.history.length > 1) window.history.back();
+              else window.location.href = "/";
+            }}
+          >
+            <ArrowLeft className="w-4 h-4 text-white" />
+          </button>
+          <div>
+            <p className="text-[10px] text-muted-foreground uppercase tracking-widest">Motorista</p>
+            <p className="font-bold text-base">{dashboard?.motorista?.nome ?? "Aguardando login..."}</p>
+          </div>
         </div>
         <div className="flex items-center gap-1.5">
           <Navigation className="w-3.5 h-3.5 text-success" />

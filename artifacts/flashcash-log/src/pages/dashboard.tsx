@@ -12,7 +12,7 @@ import {
   Wallet, Truck, FileCheck2, Send, TrendingUp, TrendingDown,
   Activity, Clock, CheckCircle2, AlertCircle, X, MapPin,
   Zap, Mail, Shield, Timer, DollarSign, AlertTriangle,
-  Plus, Link2, Package
+  Plus, Link2, Package, Download
 } from "lucide-react";
 import { useLocation } from "wouter";
 import { useFlashStore } from "@/lib/flash-store";
@@ -156,6 +156,53 @@ export default function Dashboard() {
             onClick={() => navigate("/motoristas")}
           >
             <Link2 className="w-4 h-4" /> Enviar Link
+          </Button>
+          <Button
+            variant="outline"
+            className="h-9 px-4 text-sm border-border gap-2 hover:border-white/30"
+            onClick={async () => {
+              try {
+                const viagens = await api.get<any[]>("/viagens?transportadoraId=1");
+                const now = new Date();
+                const mes = now.getMonth();
+                const ano = now.getFullYear();
+                const doMes = (Array.isArray(viagens) ? viagens : []).filter((v: any) => {
+                  const d = new Date(v.dataEntrega ?? v.createdAt ?? 0);
+                  return d.getMonth() === mes && d.getFullYear() === ano;
+                });
+
+                const header = ["ID","NF","Cliente","Motorista","Origem","Destino","Valor Frete","Status","Data Entrega"];
+                const rows = doMes.map((v: any) => [
+                  v.id,
+                  v.numeroNF ?? "",
+                  v.clienteNome ?? "",
+                  v.motoristaNome ?? "",
+                  v.origem ?? "",
+                  v.destino ?? "",
+                  typeof v.valorFrete === "number" ? v.valorFrete.toFixed(2).replace(".", ",") : "",
+                  v.status ?? "",
+                  v.dataEntrega ? new Date(v.dataEntrega).toLocaleString("pt-BR") : "",
+                ]);
+                const csv = [header, ...rows]
+                  .map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(";"))
+                  .join("\n");
+                const bom = "\uFEFF"; // UTF-8 BOM para Excel
+                const blob = new Blob([bom + csv], { type: "text/csv;charset=utf-8;" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `relatorio-techsin-${ano}-${String(mes + 1).padStart(2, "0")}.csv`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                toast({ title: "Relatório gerado", description: `${rows.length} viagens exportadas.` });
+              } catch (err) {
+                toast({ title: "Erro ao gerar relatório", variant: "destructive" });
+              }
+            }}
+          >
+            <Download className="w-4 h-4" /> Relatório Mensal
           </Button>
         </div>
       </div>

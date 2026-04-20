@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Search, RefreshCw, CheckCircle2, XCircle, Clock, AlertTriangle,
-  MapPin, Camera, FileText, ShieldCheck, Filter, X
+  MapPin, Camera, FileText, ShieldCheck, Filter, X, Pencil, Check, Loader2
 } from "lucide-react";
 import { formatCurrency } from "@/lib/format";
 
@@ -16,6 +16,7 @@ interface Canhoto {
   valorDetectado?: number; valorFrete?: number; sealId?: string;
   assinaturaDetectada?: boolean; status: string; observacoes?: string;
   timestamp?: string; createdAt?: string;
+  clienteId?: number | null;
   clienteNome?: string; clienteEmail?: string; motoristaNome?: string;
   origem?: string; destino?: string;
   fraudAlert?: boolean; fraudDistanciaMetros?: number;
@@ -57,6 +58,44 @@ export default function Arquivo() {
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [selected, setSelected] = useState<Canhoto | null>(null);
 
+  // Estado para edição inline do e-mail de faturamento
+  const [editingEmail, setEditingEmail] = useState(false);
+  const [emailDraft, setEmailDraft] = useState("");
+  const [savingEmail, setSavingEmail] = useState(false);
+
+  const startEditEmail = () => {
+    setEmailDraft(selected?.clienteEmail ?? "");
+    setEditingEmail(true);
+  };
+
+  const cancelEditEmail = () => {
+    setEditingEmail(false);
+    setEmailDraft("");
+  };
+
+  const saveEmail = async () => {
+    if (!selected?.clienteId) {
+      alert("Este registro não tem cliente vinculado. Associe um cliente antes de editar o e-mail.");
+      return;
+    }
+    const trimmed = emailDraft.trim();
+    if (!trimmed || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+      alert("E-mail inválido.");
+      return;
+    }
+    try {
+      setSavingEmail(true);
+      await api.patch(`/clientes/${selected.clienteId}`, { emailFinanceiro: trimmed });
+      setSelected({ ...selected, clienteEmail: trimmed });
+      setCanhotos(prev => prev.map(c => c.clienteId === selected.clienteId ? { ...c, clienteEmail: trimmed } : c));
+      setEditingEmail(false);
+    } catch (err) {
+      alert("Erro ao salvar. Tente novamente.");
+    } finally {
+      setSavingEmail(false);
+    }
+  };
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -66,6 +105,12 @@ export default function Arquivo() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  // Reseta edição inline quando admin seleciona outro canhoto na fila
+  useEffect(() => {
+    setEditingEmail(false);
+    setEmailDraft("");
+  }, [selected?.id]);
 
   const filtered = canhotos.filter(c => {
     const q = search.toLowerCase();
@@ -261,10 +306,61 @@ export default function Arquivo() {
               <div className="rounded-lg border border-border overflow-hidden">
                 <table className="w-full text-xs">
                   <tbody>
+                    {/* Linha especial: E-mail Faturamento com edição inline */}
+                    <tr className="bg-background/40">
+                      <td className="px-3 py-2 text-muted-foreground w-44 shrink-0">E-mail Faturamento</td>
+                      <td className="px-3 py-2 text-foreground">
+                        {editingEmail ? (
+                          <div className="flex items-center gap-1.5">
+                            <Input
+                              type="email"
+                              value={emailDraft}
+                              onChange={(e) => setEmailDraft(e.target.value)}
+                              className="h-7 text-xs flex-1"
+                              placeholder="financeiro@cliente.com"
+                              disabled={savingEmail}
+                              autoFocus
+                            />
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 w-7 p-0 border-success/30 text-success"
+                              onClick={saveEmail}
+                              disabled={savingEmail}
+                              aria-label="Salvar e-mail"
+                            >
+                              {savingEmail ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 w-7 p-0 border-border"
+                              onClick={cancelEditEmail}
+                              disabled={savingEmail}
+                              aria-label="Cancelar"
+                            >
+                              <X className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <span className="flex-1">{selected.clienteEmail ?? "—"}</span>
+                            <button
+                              type="button"
+                              onClick={startEditEmail}
+                              className="p-1 rounded hover:bg-white/5 text-muted-foreground hover:text-primary transition-colors"
+                              aria-label="Editar e-mail"
+                              title="Editar e-mail de faturamento"
+                            >
+                              <Pencil className="w-3 h-3" />
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
                     {[
                       ["Nota Fiscal", selected.numeroNF ?? "—"],
                       ["Cliente", selected.clienteNome ?? "—"],
-                      ["E-mail Faturamento", selected.clienteEmail ?? "—"],
                       ["CNPJ Cliente", selected.cnpjCliente ?? "—"],
                       ["Motorista", selected.motoristaNome ?? "—"],
                       ["Valor do Frete", selected.valorFrete ? formatCurrency(selected.valorFrete) : "—"],

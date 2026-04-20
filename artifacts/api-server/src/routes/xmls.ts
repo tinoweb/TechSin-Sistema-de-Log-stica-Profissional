@@ -70,16 +70,19 @@ router.post("/xmls/ocr", async (req, res) => {
       status:           "pendente",
     }).returning();
 
-    /* ── PASSO 2: Cria Viagem IMEDIATAMENTE (antes do OCR) ──────── */
+    /* ── PASSO 2: Cria Viagem IMEDIATAMENTE (antes do OCR) ──────── 
+     * IMPORTANTE: NÃO assumir cliente padrão. Deixar clienteId null para
+     * que seja atribuído após o OCR (com base no CNPJ extraído) ou
+     * manualmente pelo admin na fila de conferência. Isso evita o bug
+     * onde todos os fretes iam para o primeiro cliente cadastrado.
+     * ───────────────────────────────────────────────────────────────── */
     const [defaultMotorista] = await db.select().from(motoristasTable)
       .where(eq(motoristasTable.transportadoraId, transportadoraId)).limit(1);
-    const [defaultCliente] = await db.select().from(clientesTable)
-      .where(eq(clientesTable.transportadoraId, transportadoraId)).limit(1);
 
     const [viagem] = await db.insert(viagensTable).values({
       transportadoraId,
       motoristaId:  defaultMotorista?.id ?? null,
-      clienteId:    defaultCliente?.id ?? null,
+      clienteId:    null, // Preenchido depois via OCR ou manualmente
       numeroNF:     placeholderNumeroCte,
       valorFrete:   "0",
       status:       "pendente",
@@ -111,11 +114,28 @@ router.post("/xmls/ocr", async (req, res) => {
         ? ocr.numeroNF
         : [ocr.tipoDocumento.toUpperCase().replace("_", " "), placeholderNumeroCte].join(" — ");
 
-      /* Busca cliente pelo CNPJ extraído se disponível */
-      let clienteOcr = defaultCliente;
+      /* Busca cliente pelo CNPJ extraído. Se não encontrar, cria automaticamente
+       * com os dados do OCR — admin pode completar dados depois na tela de clientes. */
+      let clienteOcr: { id: number } | null = null;
       if (ocr.cnpj) {
         const [porCnpj] = await db.select().from(clientesTable).where(eq(clientesTable.cnpj, ocr.cnpj)).limit(1);
-        if (porCnpj) clienteOcr = porCnpj;
+        if (porCnpj) {
+          clienteOcr = porCnpj;
+        } else {
+          try {
+            const [novoCliente] = await db.insert(clientesTable).values({
+              transportadoraId,
+              nome:   ocr.descricao || `Cliente ${ocr.cnpj}`,
+              cnpj:   ocr.cnpj,
+              email:  `pendente+${Date.now()}@preencher.com`, // placeholder — admin deve atualizar
+              endereco: ocr.enderecoEntrega ?? null,
+            }).returning();
+            clienteOcr = novoCliente;
+            req.log.info({ clienteId: novoCliente.id, cnpj: ocr.cnpj }, "ocr: cliente criado automaticamente");
+          } catch (clienteErr) {
+            req.log.warn({ clienteErr, cnpj: ocr.cnpj }, "ocr: falha ao criar cliente — viagem ficará sem cliente");
+          }
+        }
       }
 
       await db.update(xmlsTable).set({
@@ -162,6 +182,70 @@ router.post("/xmls/ocr", async (req, res) => {
   } catch (err) {
     req.log.error({ err }, "ocr: erro fatal ao processar documento");
     return res.status(500).json({ error: "Erro ao processar documento com OCR" });
+  }
+});
+
+/* ── Edição manual de dados na fila de conferência ──
+ * Usado quando OCR falha ou extrai dados parciais. Admin
+ * pode ajustar valor, CNPJ, cliente vinculado etc. ──── */
+router.patch("/xmls/:id", async (req, res) => {
+  try {
+    const xmlId = parseInt(req.params.id);
+    if (Number.isNaN(xmlId)) return res.status(400).json({ error: "id inválido" });
+
+    const {
+      numeroCte,
+      cnpjDestinatario,
+      cnpjEmissor,
+      nomeDestinatario,
+      valorFrete,
+      dataEmissao,
+      enderecoEntrega,
+      chaveAcesso,
+      clienteId,
+      status,
+    } = req.body as Record<string, unknown>;
+
+    const updates: Record<string, unknown> = {};
+    if (typeof numeroCte === "string")        updates.numeroCte = numeroCte;
+    if (typeof cnpjDestinatario === "string") updates.cnpjDestinatario = cnpjDestinatario;
+    if (typeof cnpjEmissor === "string")      updates.cnpjEmissor = cnpjEmissor;
+    if (typeof nomeDestinatario === "string") updates.nomeDestinatario = nomeDestinatario;
+    if (valorFrete !== undefined && valorFrete !== null) updates.valorFrete = String(valorFrete);
+    if (typeof dataEmissao === "string")      updates.dataEmissao = new Date(dataEmissao);
+    if (typeof enderecoEntrega === "string")  updates.enderecoEntrega = enderecoEntrega;
+    if (typeof chaveAcesso === "string")      updates.chaveAcesso = chaveAcesso;
+    if (typeof status === "string")           updates.status = status;
+
+    const [updated] = await db.update(xmlsTable)
+      .set(updates)
+      .where(eq(xmlsTable.id, xmlId))
+      .returning();
+
+    if (!updated) return res.status(404).json({ error: "XML não encontrado" });
+
+    /* Propaga alterações relevantes para a viagem associada */
+    if (updated.viagemId) {
+      const viagemUpdates: Record<string, unknown> = {};
+      if (updates.numeroCte)   viagemUpdates.numeroNF = updates.numeroCte;
+      if (updates.valorFrete)  viagemUpdates.valorFrete = updates.valorFrete;
+      if (updates.enderecoEntrega) viagemUpdates.destino = updates.enderecoEntrega;
+      if (typeof clienteId === "number") viagemUpdates.clienteId = clienteId;
+
+      if (Object.keys(viagemUpdates).length > 0) {
+        await db.update(viagensTable)
+          .set(viagemUpdates)
+          .where(eq(viagensTable.id, updated.viagemId));
+      }
+    }
+
+    res.json({
+      ...updated,
+      valorFrete: updated.valorFrete ? parseFloat(updated.valorFrete as string) : null,
+    });
+  } catch (err) {
+    req.log.error({ err }, "Error updating xml");
+    res.status(500).json({ error: "Internal server error" });
   }
 });
 

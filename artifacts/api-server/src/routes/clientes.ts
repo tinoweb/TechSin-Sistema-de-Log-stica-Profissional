@@ -74,4 +74,39 @@ router.post("/clientes", async (req, res) => {
   }
 });
 
+/* ── Atualização de dados do cliente ──
+ * Usado principalmente para atualizar email de faturamento
+ * quando OCR cadastra cliente automaticamente com placeholder. */
+router.patch("/clientes/:id", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    if (Number.isNaN(id)) return res.status(400).json({ error: "id inválido" });
+
+    const { nome, cnpj, email, emailFinanceiro, telefone, endereco } = req.body as Record<string, unknown>;
+
+    const updates: Record<string, unknown> = {};
+    if (typeof nome === "string" && nome.trim())     updates.nome = nome.trim();
+    if (typeof cnpj === "string" && cnpj.trim())     updates.cnpj = cnpj.trim();
+    if (typeof email === "string" && email.trim())   updates.email = email.trim();
+    if (typeof emailFinanceiro === "string")         updates.emailFinanceiro = emailFinanceiro.trim() || null;
+    if (typeof telefone === "string")                updates.telefone = telefone.trim() || null;
+    if (typeof endereco === "string")                updates.endereco = endereco.trim() || null;
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ error: "Nenhum campo válido enviado" });
+    }
+
+    const [updated] = await db.update(clientesTable)
+      .set(updates)
+      .where(eq(clientesTable.id, id))
+      .returning();
+
+    if (!updated) return res.status(404).json({ error: "Cliente não encontrado" });
+    res.json(updated);
+  } catch (err) {
+    req.log.error({ err }, "Error updating cliente");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 export default router;
