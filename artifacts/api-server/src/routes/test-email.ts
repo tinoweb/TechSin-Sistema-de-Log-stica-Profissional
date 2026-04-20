@@ -7,11 +7,12 @@ const router = Router();
 /**
  * GET /api/test-email
  * Rota para testar o envio de email
+ * (montada sob /api no app.ts — por isso só /test-email aqui)
  * Query params:
  *   - to: email destinatário (opcional, padrão: teste@exemplo.com)
  *   - force: enviar mesmo sem RESEND_API_KEY (opcional)
  */
-router.get("/api/test-email", async (req, res) => {
+router.get("/test-email", async (req, res) => {
   const to = (req.query.to as string) || "teste@exemplo.com";
   const force = req.query.force === "true";
 

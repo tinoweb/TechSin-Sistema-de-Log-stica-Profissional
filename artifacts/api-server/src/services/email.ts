@@ -10,6 +10,9 @@ export interface EmailPayload {
 }
 
 const RESEND_KEY = process.env["RESEND_API_KEY"];
+// Remetente configurável via env. Fallback = domínio de testes do Resend
+// (onboarding@resend.dev) — funciona sem verificação de domínio.
+const EMAIL_FROM = process.env["EMAIL_FROM"] ?? "TechSin <onboarding@resend.dev>";
 
 export async function sendBillingEmail(payload: EmailPayload): Promise<{ sent: boolean; preview: string }> {
   const body = buildEmailBody(payload);
@@ -20,18 +23,18 @@ export async function sendBillingEmail(payload: EmailPayload): Promise<{ sent: b
         method: "POST",
         headers: { "Authorization": `Bearer ${RESEND_KEY}`, "Content-Type": "application/json" },
         body: JSON.stringify({
-          from: "TechSin <noreply@techsin.com.br>",
+          from: EMAIL_FROM,
           to: [payload.to],
           subject: `[TechSin] Cobrança – NF ${payload.numeroNF} – ${new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(payload.valorFrete)}`,
           html: body,
         }),
       });
       if (res.ok) {
-        logger.info({ to: payload.to, nf: payload.numeroNF }, "email: enviado via Resend");
+        logger.info({ to: payload.to, nf: payload.numeroNF, from: EMAIL_FROM }, "email: enviado via Resend");
         return { sent: true, preview: body };
       }
       const err = await res.text();
-      logger.warn({ err, to: payload.to }, "email: falha Resend — registrado como pendente");
+      logger.warn({ err, to: payload.to, from: EMAIL_FROM, status: res.status }, "email: falha Resend — registrado como pendente");
     } catch (err) {
       logger.warn({ err }, "email: erro de rede ao enviar");
     }
