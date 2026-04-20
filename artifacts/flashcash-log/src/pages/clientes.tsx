@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/dialog";
 import { Search, Plus, Building2, MoreHorizontal } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency, displayEmail } from "@/lib/format";
 
 export default function Clientes() {
   const { data: clientes, isLoading } = useListClientes({
@@ -159,8 +159,10 @@ export default function Clientes() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <div className="text-sm text-white">{c.email}</div>
-                      {c.emailFinanceiro && <div className="text-xs text-primary">{c.emailFinanceiro}</div>}
+                      <div className="text-sm text-white">
+                        {displayEmail(c.email) ?? <span className="text-amber-400 italic">— preencher</span>}
+                      </div>
+                      {displayEmail(c.emailFinanceiro) && <div className="text-xs text-primary">{c.emailFinanceiro}</div>}
                     </TableCell>
                     <TableCell className="text-right font-mono text-muted-foreground">{c.totalFaturas || 0}</TableCell>
                     <TableCell className="text-right font-medium text-success">{formatCurrency(c.valorTotal)}</TableCell>

@@ -7,7 +7,7 @@ import {
   Search, RefreshCw, CheckCircle2, XCircle, Clock, AlertTriangle,
   MapPin, Camera, FileText, ShieldCheck, Filter, X, Pencil, Check, Loader2
 } from "lucide-react";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency, displayEmail, isPlaceholderEmail } from "@/lib/format";
 
 interface Canhoto {
   id: number; viagemId: number;
@@ -64,7 +64,8 @@ export default function Arquivo() {
   const [savingEmail, setSavingEmail] = useState(false);
 
   const startEditEmail = () => {
-    setEmailDraft(selected?.clienteEmail ?? "");
+    // Se for placeholder automatico, comeca com campo vazio para o admin preencher
+    setEmailDraft(displayEmail(selected?.clienteEmail) ?? "");
     setEditingEmail(true);
   };
 
@@ -85,7 +86,13 @@ export default function Arquivo() {
     }
     try {
       setSavingEmail(true);
-      await api.patch(`/clientes/${selected.clienteId}`, { emailFinanceiro: trimmed });
+      // Se cliente ainda tem email geral como placeholder, atualiza ambos
+      // (emailFinanceiro + email) para limpar o "pendente" da lista de clientes.
+      const payload: Record<string, string> = { emailFinanceiro: trimmed };
+      if (isPlaceholderEmail(selected.clienteEmail)) {
+        payload.email = trimmed;
+      }
+      await api.patch(`/clientes/${selected.clienteId}`, payload);
       setSelected({ ...selected, clienteEmail: trimmed });
       setCanhotos(prev => prev.map(c => c.clienteId === selected.clienteId ? { ...c, clienteEmail: trimmed } : c));
       setEditingEmail(false);
@@ -344,7 +351,9 @@ export default function Arquivo() {
                           </div>
                         ) : (
                           <div className="flex items-center gap-2">
-                            <span className="flex-1">{selected.clienteEmail ?? "—"}</span>
+                            <span className={`flex-1 ${displayEmail(selected.clienteEmail) ? "" : "text-amber-400 italic"}`}>
+                              {displayEmail(selected.clienteEmail) ?? "— clique no lápis para preencher"}
+                            </span>
                             <button
                               type="button"
                               onClick={startEditEmail}
