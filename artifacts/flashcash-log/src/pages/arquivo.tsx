@@ -119,6 +119,11 @@ export default function Arquivo() {
     setEmailDraft("");
   }, [selected?.id]);
 
+  // Filtro opcional por clienteId vindo de outra tela (ex: pagina de Clientes)
+  const clienteIdFilter = typeof window !== "undefined"
+    ? new URLSearchParams(window.location.search).get("clienteId")
+    : null;
+
   const filtered = canhotos.filter(c => {
     const q = search.toLowerCase();
     const matchSearch = !q ||
@@ -129,7 +134,8 @@ export default function Arquivo() {
       (c.sealId ?? "").toLowerCase().includes(q) ||
       (c.createdAt ?? "").includes(q);
     const matchStatus = filterStatus === "all" || c.status === filterStatus || (filterStatus === "fraude" && c.fraudAlert);
-    return matchSearch && matchStatus;
+    const matchCliente = !clienteIdFilter || String(c.clienteId) === clienteIdFilter;
+    return matchSearch && matchStatus && matchCliente;
   });
 
   const stats = {

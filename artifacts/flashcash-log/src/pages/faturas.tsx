@@ -12,9 +12,17 @@ import { useToast } from "@/hooks/use-toast";
 import { formatCurrency, formatDate } from "@/lib/format";
 
 export default function Faturas() {
-  const { data: faturas, isLoading } = useListFaturas({ query: { queryKey: ["faturas"] } });
+  const { data: faturasAll, isLoading } = useListFaturas({ query: { queryKey: ["faturas"] } });
   const queryClient = useQueryClient();
   const { toast } = useToast();
+
+  // Filtro opcional por clienteId vindo de outra tela (ex: pagina de Clientes)
+  const clienteIdFilter = typeof window !== "undefined"
+    ? new URLSearchParams(window.location.search).get("clienteId")
+    : null;
+  const faturas = clienteIdFilter
+    ? faturasAll?.filter(f => String((f as any).clienteId) === clienteIdFilter)
+    : faturasAll;
 
   const anteciparMutation = useAnteciparFatura({
     mutation: {

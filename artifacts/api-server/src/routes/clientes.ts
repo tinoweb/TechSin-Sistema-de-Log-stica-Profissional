@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, clientesTable, transportadorasTable } from "@workspace/db";
+import { db, clientesTable, transportadorasTable, viagensTable, faturasTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 
 const router: IRouter = Router();
@@ -105,6 +105,45 @@ router.patch("/clientes/:id", async (req, res) => {
     res.json(updated);
   } catch (err) {
     req.log.error({ err }, "Error updating cliente");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+/* ── Exclusão de cliente ──
+ * Bloqueia exclusão se o cliente tem viagens ou faturas vinculadas
+ * para preservar histórico fiscal e integridade referencial.
+ * Use case principal: limpar cliente criado automaticamente pelo OCR
+ * com dados incorretos antes de qualquer viagem ser registrada. */
+router.delete("/clientes/:id", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    if (Number.isNaN(id)) return res.status(400).json({ error: "id inválido" });
+
+    const [existing] = await db.select().from(clientesTable).where(eq(clientesTable.id, id));
+    if (!existing) return res.status(404).json({ error: "Cliente não encontrado" });
+
+    const viagensVinculadas = await db
+      .select({ id: viagensTable.id })
+      .from(viagensTable)
+      .where(eq(viagensTable.clienteId, id));
+
+    const faturasVinculadas = await db
+      .select({ id: faturasTable.id })
+      .from(faturasTable)
+      .where(eq(faturasTable.clienteId, id));
+
+    if (viagensVinculadas.length > 0 || faturasVinculadas.length > 0) {
+      return res.status(409).json({
+        error: "Cliente possui registros vinculados e não pode ser excluído",
+        viagens:  viagensVinculadas.length,
+        faturas:  faturasVinculadas.length,
+      });
+    }
+
+    await db.delete(clientesTable).where(eq(clientesTable.id, id));
+    res.json({ ok: true, id });
+  } catch (err) {
+    req.log.error({ err }, "Error deleting cliente");
     res.status(500).json({ error: "Internal server error" });
   }
 });

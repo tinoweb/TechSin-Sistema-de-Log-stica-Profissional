@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, canhotosTable, viagensTable, faturasTable, motoristasTable, clientesTable, xmlsTable } from "@workspace/db";
+import { db, canhotosTable, viagensTable, faturasTable, motoristasTable, clientesTable, xmlsTable, transportadorasTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { sendBillingEmail } from "../services/email";
@@ -227,18 +227,30 @@ router.post("/canhotos/:id/approve", async (req, res) => {
         await db.update(xmlsTable).set({ status: "conciliado" }).where(eq(xmlsTable.id, viagem.xmlId));
       }
 
-      /* ── Dispara E-mail Expresso de Cobrança ────────────────────── */
+      /* ── Dispara E-mail Expresso de Cobrança (white-label por transportadora) ── */
       try {
         const [cliente] = await db.select().from(clientesTable).where(eq(clientesTable.id, viagem.clienteId));
+        const [transportadora] = await db
+          .select()
+          .from(transportadorasTable)
+          .where(eq(transportadorasTable.id, viagem.transportadoraId));
+
         if (cliente) {
           const emailTo = (viagem as any).emailFinanceiro ?? cliente.emailFinanceiro ?? cliente.email;
+          // Nome exibido no remetente: prefere emailRemetente (nome comercial),
+          // cai para o nome da transportadora se não estiver configurado.
+          const transportadoraNome = transportadora?.emailRemetente?.trim()
+            || transportadora?.nome
+            || undefined;
+
           emailResult = await sendBillingEmail({
-            to:           emailTo,
-            clienteNome:  cliente.nome,
-            numeroNF:     canhoto.numeroNF ?? viagem.numeroNF ?? `VGM-${viagem.id}`,
-            valorFrete:   parseFloat(viagem.valorFrete as string),
-            destino:      viagem.destino ?? undefined,
-            sealId:       canhoto.sealId ?? undefined,
+            to:                  emailTo,
+            clienteNome:         cliente.nome,
+            numeroNF:            canhoto.numeroNF ?? viagem.numeroNF ?? `VGM-${viagem.id}`,
+            valorFrete:          parseFloat(viagem.valorFrete as string),
+            destino:             viagem.destino ?? undefined,
+            sealId:              canhoto.sealId ?? undefined,
+            transportadoraNome,
           });
         }
       } catch (emailErr) {
