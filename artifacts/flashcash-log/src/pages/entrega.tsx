@@ -6,7 +6,7 @@ import { formatCurrency } from "@/lib/format";
 import {
   MapPin, Camera, CheckCircle2, AlertCircle, Truck,
   Package, DollarSign, User, Hash, RefreshCw, Navigation,
-  ExternalLink, Upload, X,
+  ExternalLink, Upload, X, Loader2, ShieldOff,
 } from "lucide-react";
 
 interface EntregaData {
@@ -22,6 +22,7 @@ interface EntregaData {
 }
 
 type PageState = "loading" | "idle" | "sending" | "success" | "error";
+type GpsStatus = "pending" | "granted" | "denied" | "unavailable";
 
 function compressImage(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -59,12 +60,38 @@ export default function Entrega() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // GPS: capturamos ao abrir a tela para provar ponto de entrega.
+  // Envio continua permitido mesmo sem GPS (permissão negada / indoor etc),
+  // mas o ponto não aparecerá no Arquivo de Operações.
+  const [gpsStatus, setGpsStatus] = useState<GpsStatus>("pending");
+  const [coords, setCoords] = useState<{ lat: number; lon: number } | null>(null);
+
+  const requestGps = useCallback(() => {
+    if (!navigator.geolocation) {
+      setGpsStatus("unavailable");
+      return;
+    }
+    setGpsStatus("pending");
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setCoords({ lat: pos.coords.latitude, lon: pos.coords.longitude });
+        setGpsStatus("granted");
+      },
+      (err) => {
+        setGpsStatus(err.code === err.PERMISSION_DENIED ? "denied" : "unavailable");
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  }, []);
+
   useEffect(() => {
     if (!id) { setPageState("error"); setErrorMsg("Link inválido."); return; }
     api.get<EntregaData>(`/viagens/${id}`)
       .then(d => { setData(d); setPageState("idle"); })
       .catch(() => { setPageState("error"); setErrorMsg("Entrega não encontrada."); });
   }, [id]);
+
+  useEffect(() => { requestGps(); }, [requestGps]);
 
   const handleFile = useCallback(async (file: File) => {
     try {
@@ -84,17 +111,21 @@ export default function Entrega() {
   const submitCanhoto = async () => {
     if (!data || !preview) return;
     setPageState("sending");
+    setErrorMsg("");
     try {
       await api.post(`/viagens/${id}/canhoto`, {
-        fotoUrl: preview,
-        numeroNF: data.numeroNF,
+        fotoUrl:             preview,
+        numeroNF:            data.numeroNF,
         assinaturaDetectada: true,
-        capturedAt: new Date().toISOString(),
+        capturedAt:          new Date().toISOString(),
+        // GPS opcional — só envia se conseguimos capturar.
+        latitude:            coords?.lat,
+        longitude:           coords?.lon,
       });
       setPageState("success");
     } catch (e: any) {
       setPageState("error");
-      setErrorMsg(e.message ?? "Erro ao enviar. Tente novamente.");
+      setErrorMsg(e?.message ?? "Não conseguimos enviar agora. Verifique sua conexão e tente novamente.");
     }
   };
 
@@ -272,6 +303,51 @@ export default function Entrega() {
           )}
         </div>
 
+        {/* Status do GPS */}
+        <div
+          className={`rounded-xl px-3 py-2.5 flex items-center gap-2.5 border ${
+            gpsStatus === "granted"
+              ? "bg-green-500/8 border-green-500/25"
+              : gpsStatus === "pending"
+              ? "bg-blue-500/8 border-blue-500/20"
+              : "bg-amber-500/8 border-amber-500/25"
+          }`}
+        >
+          {gpsStatus === "granted" && <MapPin className="w-4 h-4 text-green-400 shrink-0" />}
+          {gpsStatus === "pending" && <Loader2 className="w-4 h-4 text-blue-400 shrink-0 animate-spin" />}
+          {(gpsStatus === "denied" || gpsStatus === "unavailable") && <ShieldOff className="w-4 h-4 text-amber-400 shrink-0" />}
+          <div className="flex-1 min-w-0">
+            {gpsStatus === "granted" && (
+              <p className="text-[11px] text-green-300 font-medium leading-tight">
+                Localização capturada — ponto de entrega será registrado
+              </p>
+            )}
+            {gpsStatus === "pending" && (
+              <p className="text-[11px] text-blue-300 font-medium leading-tight">
+                Obtendo localização...
+              </p>
+            )}
+            {gpsStatus === "denied" && (
+              <p className="text-[11px] text-amber-300 font-medium leading-tight">
+                Localização bloqueada. Você pode enviar sem GPS, mas o ponto não será registrado.
+              </p>
+            )}
+            {gpsStatus === "unavailable" && (
+              <p className="text-[11px] text-amber-300 font-medium leading-tight">
+                GPS indisponível neste dispositivo. O envio continua funcionando normalmente.
+              </p>
+            )}
+          </div>
+          {(gpsStatus === "denied" || gpsStatus === "unavailable") && (
+            <button
+              onClick={requestGps}
+              className="text-[10px] font-semibold text-amber-300 uppercase tracking-wider underline underline-offset-2"
+            >
+              Tentar
+            </button>
+          )}
+        </div>
+
         {/* Upload do canhoto */}
         <div className="bg-white/4 border border-white/8 rounded-xl p-4 space-y-3">
           <div className="flex items-center gap-2">
@@ -326,9 +402,20 @@ export default function Entrega() {
           )}
 
           {pageState === "error" && errorMsg && (
-            <div className="flex items-center gap-2 text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
-              <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-              {errorMsg}
+            <div className="space-y-2">
+              <div className="flex items-start gap-2 text-xs text-red-300 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2.5">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                <span className="leading-snug">{errorMsg}</span>
+              </div>
+              {preview && (
+                <Button
+                  onClick={submitCanhoto}
+                  className="w-full h-10 text-xs font-semibold gap-2"
+                  style={{ background: "rgba(37,99,235,0.15)", border: "1px solid rgba(37,99,235,0.35)", color: "#93C5FD" }}
+                >
+                  <RefreshCw className="w-3.5 h-3.5" /> Tentar enviar novamente
+                </Button>
+              )}
             </div>
           )}
         </div>
