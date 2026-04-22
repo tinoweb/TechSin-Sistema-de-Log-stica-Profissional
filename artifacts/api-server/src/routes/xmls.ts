@@ -300,4 +300,43 @@ router.post("/xmls/:id/match", async (req, res) => {
   }
 });
 
+/* ── Exclusão de documento XML ──
+ * Permite excluir um documento XML com motivo obrigatório.
+ * Também remove a viagem associada se existir. ──── */
+router.delete("/xmls/:id", async (req, res) => {
+  try {
+    const xmlId = parseInt(req.params.id);
+    if (Number.isNaN(xmlId)) return res.status(400).json({ error: "id inválido" });
+
+    const { motivo } = req.query;
+    if (!motivo || typeof motivo !== "string") {
+      return res.status(400).json({ error: "motivo da exclusão é obrigatório" });
+    }
+
+    const [xml] = await db.select().from(xmlsTable).where(eq(xmlsTable.id, xmlId));
+    if (!xml) return res.status(404).json({ error: "XML não encontrado" });
+
+    // Verifica se pertence à transportadora correta
+    const transportadoraId = resolveTenantId(req);
+    if (typeof transportadoraId === "number" && xml.transportadoraId !== transportadoraId) {
+      return res.status(403).json({ error: "Sem permissão para excluir este documento" });
+    }
+
+    // Remove a viagem associada se existir
+    if (xml.viagemId) {
+      await db.delete(viagensTable).where(eq(viagensTable.id, xml.viagemId));
+      req.log.info({ viagemId: xml.viagemId, motivo }, "viagem associada excluída");
+    }
+
+    // Remove o XML
+    await db.delete(xmlsTable).where(eq(xmlsTable.id, xmlId));
+    req.log.info({ xmlId, motivo }, "XML excluído");
+
+    res.json({ success: true, xmlId, motivo });
+  } catch (err) {
+    req.log.error({ err }, "Error deleting xml");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 export default router;
