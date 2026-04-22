@@ -3,6 +3,7 @@ import { db, canhotosTable, viagensTable, faturasTable, motoristasTable, cliente
 import { eq, and } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { sendBillingEmail } from "../services/email";
+import { extractDocumentDataWithTimeout, computeConfidence } from "../services/ocr";
 
 const router: IRouter = Router();
 
@@ -22,11 +23,38 @@ router.post("/viagens/:id/canhoto", async (req, res) => {
     const [viagem] = await db.select().from(viagensTable).where(eq(viagensTable.id, viagemId));
     if (!viagem) return res.status(404).json({ error: "Viagem not found" });
 
-    const { fotoUrl, latitude, longitude, numeroCte, cnpjCliente, numeroNF, valorDetectado, assinaturaDetectada, capturedAt } = req.body;
+    const { fotoUrl, latitude, longitude, numeroCte, capturedAt } = req.body;
+    // Hints enviados pelo cliente (opcionais). O OCR é quem decide de verdade.
+    let { cnpjCliente, numeroNF, valorDetectado, assinaturaDetectada } = req.body;
 
     const sealId = `SEAL-${randomUUID().substring(0, 8).toUpperCase()}`;
-    const iaConfidencia = assinaturaDetectada && cnpjCliente ? 0.94 : 0.72;
+
+    /* ── Análise IA (OCR + assinatura + confiança) ─────────────────
+     * Executa com timeout de 20s para não travar o motorista.
+     * Se falhar / sem API key, cai no fallback (legivel=false, confianca=0.3). */
+    const expectedNF = (numeroNF as string | undefined) ?? viagem.numeroNF ?? null;
+    const ocr = fotoUrl
+      ? await extractDocumentDataWithTimeout(fotoUrl, 20000)
+      : null;
+
+    // Preenche os campos com o que a IA extraiu, respeitando o que já veio do cliente.
+    if (ocr) {
+      numeroNF            = numeroNF            ?? ocr.numeroNF ?? undefined;
+      cnpjCliente         = cnpjCliente         ?? ocr.cnpj ?? undefined;
+      valorDetectado      = valorDetectado      ?? ocr.valorTotal ?? undefined;
+      assinaturaDetectada = typeof assinaturaDetectada === "boolean" ? assinaturaDetectada : ocr.assinaturaDetectada;
+    }
+
+    const iaConfidencia = ocr
+      ? computeConfidence(ocr, expectedNF)
+      : 0.3;
     const autoStatus = iaConfidencia > 0.85 ? "validado" : "pendente";
+
+    req.log.info({
+      nf: numeroNF, expectedNF, iaConfidencia,
+      legivel: ocr?.legivel, assinatura: ocr?.assinaturaDetectada,
+      tipoDoc: ocr?.tipoDocumento, autoStatus,
+    }, "canhoto: resultado da análise IA");
 
     // Geofencing check
     let fraudAlert = false;
