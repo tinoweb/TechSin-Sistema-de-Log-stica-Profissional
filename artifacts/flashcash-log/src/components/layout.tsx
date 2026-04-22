@@ -29,6 +29,7 @@ const navItems = [
   { href: "/xml", label: "Upload XML", icon: FileCode2 },
   { href: "/motoristas", label: "Motoristas", icon: Truck },
   { href: "/clientes", label: "Clientes", icon: Users },
+  { href: "/usuarios", label: "Usuários", icon: ShieldCheck },
   { href: "/motorista-app", label: "App Motorista", icon: Smartphone },
 ];
 

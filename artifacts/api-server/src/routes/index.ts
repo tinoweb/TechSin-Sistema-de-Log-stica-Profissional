@@ -11,6 +11,7 @@ import xmlsRouter from "./xmls";
 import faturasRouter from "./faturas";
 import dashboardRouter from "./dashboard";
 import superAdminRouter from "./super-admin";
+import usuariosRouter from "./usuarios";
 import erpSyncRouter from "./erp-sync";
 import testEmailRouter from "./test-email";
 import { requireSuperAdmin } from "../middlewares/auth";
@@ -36,6 +37,7 @@ router.use(canhotosRouter);
 router.use(xmlsRouter);
 router.use(faturasRouter);
 router.use(dashboardRouter);
+router.use(usuariosRouter);
 router.use(testEmailRouter);
 
 export default router;

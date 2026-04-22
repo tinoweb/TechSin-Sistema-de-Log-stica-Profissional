@@ -21,6 +21,7 @@ import Aprovacao from "@/pages/aprovacao";
 import Arquivo from "@/pages/arquivo";
 import Entrega from "@/pages/entrega";
 import SuperAdmin from "@/pages/super-admin";
+import Usuarios from "@/pages/usuarios";
 import NotFound from "@/pages/not-found";
 import Layout from "@/components/layout";
 
@@ -49,6 +50,7 @@ function Router() {
               <Route path="/xml" component={Xml} />
               <Route path="/faturas" component={Faturas} />
               <Route path="/arquivo" component={Arquivo} />
+              <Route path="/usuarios" component={Usuarios} />
               <Route path="/super-admin">
                 <ProtectedRoute allowedRoles={["superadmin"]}>
                   <SuperAdmin />
