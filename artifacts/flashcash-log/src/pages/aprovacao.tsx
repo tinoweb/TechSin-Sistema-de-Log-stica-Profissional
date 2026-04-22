@@ -4,13 +4,16 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   CheckCircle2, XCircle, MapPin, Camera, Edit3, RefreshCw,
   ShieldCheck, Clock, AlertTriangle, X, Eye, FileText, Download,
-  MessageCircle, ExternalLink
+  MessageCircle, ExternalLink, Filter, CheckSquare
 } from "lucide-react";
 import { formatCurrency } from "@/lib/format";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
 
 interface Canhoto {
   id: number; viagemId: number; motoristaId?: number;
@@ -174,6 +177,7 @@ interface PendingViagem {
 }
 
 export default function Aprovacao() {
+  const { user } = useAuth();
   const [canhotos, setCanhotos] = useState<Canhoto[]>([]);
   const [pendingViagens, setPendingViagens] = useState<PendingViagem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -181,16 +185,26 @@ export default function Aprovacao() {
   const [generatingPdf, setGeneratingPdf] = useState<number | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [editModal, setEditModal] = useState<Canhoto | null>(null);
-  const [editForm, setEditForm] = useState({ numeroNF: "", cnpjCliente: "", observacoes: "" });
+  const [editForm, setEditForm] = useState({ numeroNF: "", cnpjCliente: "", observacoes: "", valorFrete: "", motoristaNome: "" });
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
+
+  // New states for improvements
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [filters, setFilters] = useState({ motorista: "", cliente: "", status: "todos", dataInicio: "", dataFim: "" });
+  const [rejectModal, setRejectModal] = useState<Canhoto | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
+  const [bulkRejectModal, setBulkRejectModal] = useState(false);
+  const [bulkRejectReason, setBulkRejectReason] = useState("");
+  const [fraudConfirmModal, setFraudConfirmModal] = useState<Canhoto | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
+      const tenantId = user?.transportadoraId ?? 1;
       const [all, pending] = await Promise.all([
-        api.get<Canhoto[]>("/canhotos?transportadoraId=1"),
-        api.get<PendingViagem[]>("/viagens/pendentes-canhoto?transportadoraId=1").catch(() => [] as PendingViagem[]),
+        api.get<Canhoto[]>(`/canhotos?transportadoraId=${tenantId}`),
+        api.get<PendingViagem[]>(`/viagens/pendentes-canhoto?transportadoraId=${tenantId}`).catch(() => [] as PendingViagem[]),
       ]);
       // Fila mostra apenas pendentes — aprovados vão para Operações/Faturamento
       setCanhotos(all.filter(c => c.status === "pendente"));
@@ -198,7 +212,7 @@ export default function Aprovacao() {
     } catch (e: any) {
       toast({ title: "Erro ao carregar canhotos", description: e.message, variant: "destructive" });
     } finally { setLoading(false); }
-  }, [toast]);
+  }, [toast, user?.transportadoraId]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -225,16 +239,63 @@ export default function Aprovacao() {
     } finally { setProcessing(null); }
   };
 
-  const reject = async (id: number) => {
+  const reject = async (id: number, reason: string) => {
     setProcessing(id);
     try {
-      await api.post(`/canhotos/${id}/validate`, { status: "rejeitado", observacoes: "Rejeitado manualmente pela secretária." });
+      await api.post(`/canhotos/${id}/validate`, { status: "rejeitado", observacoes: reason });
       await load();
       if (selectedId === id) setSelectedId(null);
+      setRejectModal(null);
+      setRejectReason("");
       toast({ title: "Canhoto rejeitado." });
     } catch (e: any) {
       toast({ title: "Erro", description: e.message, variant: "destructive" });
     } finally { setProcessing(null); }
+  };
+
+  const bulkApprove = async () => {
+    if (selectedIds.size === 0) return;
+    setProcessing(-1);
+    try {
+      await Promise.all(Array.from(selectedIds).map(id => api.post(`/canhotos/${id}/approve`, {})));
+      setSelectedIds(new Set());
+      await load();
+      toast({ title: `${selectedIds.size} canhotos aprovados!` });
+    } catch (e: any) {
+      toast({ title: "Erro ao aprovar em lote", description: e.message, variant: "destructive" });
+    } finally { setProcessing(null); }
+  };
+
+  const bulkReject = async () => {
+    if (selectedIds.size === 0 || !bulkRejectReason) return;
+    setProcessing(-1);
+    try {
+      await Promise.all(Array.from(selectedIds).map(id =>
+        api.post(`/canhotos/${id}/validate`, { status: "rejeitado", observacoes: bulkRejectReason })
+      ));
+      setSelectedIds(new Set());
+      setBulkRejectModal(false);
+      setBulkRejectReason("");
+      await load();
+      toast({ title: `${selectedIds.size} canhotos rejeitados!` });
+    } catch (e: any) {
+      toast({ title: "Erro ao rejeitar em lote", description: e.message, variant: "destructive" });
+    } finally { setProcessing(null); }
+  };
+
+  const bulkSendWhatsApp = () => {
+    if (selectedIds.size === 0) return;
+    const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+    const links = Array.from(selectedIds).map(id => {
+      const canhoto = canhotos.find(c => c.id === id);
+      return canhoto ? `${window.location.origin}${base}/entrega/${canhoto.viagemId}` : "";
+    }).filter(Boolean);
+    
+    const msg = links.length > 1 
+      ? `Olá! Seguem os links das suas cargas no TechSin:\n${links.join("\n")}`
+      : `Olá! Segue o link da sua carga no TechSin: ${links[0]}`;
+    
+    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
   };
 
   const downloadPDF = async (c: Canhoto) => {
@@ -277,6 +338,33 @@ export default function Aprovacao() {
   const selected = selectedId ? canhotos.find(c => c.id === selectedId) : null;
   const totalAguardando = pendentes.length + pendingViagens.length;
 
+  // Apply filters
+  const filteredCanhotos = canhotos.filter(c => {
+    if (filters.motorista && !c.motoristaNome?.toLowerCase().includes(filters.motorista.toLowerCase())) return false;
+    if (filters.cliente && !c.clienteNome?.toLowerCase().includes(filters.cliente.toLowerCase())) return false;
+    if (filters.status !== "todos" && c.status !== filters.status) return false;
+    if (filters.dataInicio && c.capturedAt && new Date(c.capturedAt) < new Date(filters.dataInicio)) return false;
+    if (filters.dataFim && c.capturedAt && new Date(c.capturedAt) > new Date(filters.dataFim)) return false;
+    return true;
+  });
+
+  const toggleSelect = (id: number) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filteredCanhotos.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredCanhotos.map(c => c.id)));
+    }
+  };
+
   return (
     <div className="space-y-5 animate-in fade-in duration-300">
       <div className="flex items-center justify-between">
@@ -300,6 +388,75 @@ export default function Aprovacao() {
           </Button>
         </div>
       </div>
+
+      {/* Filters */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <Filter className="w-3.5 h-3.5" />
+          <span>Filtros:</span>
+        </div>
+        <Input
+          placeholder="Motorista..."
+          value={filters.motorista}
+          onChange={e => setFilters(f => ({ ...f, motorista: e.target.value }))}
+          className="h-8 w-40 text-xs"
+        />
+        <Input
+          placeholder="Cliente..."
+          value={filters.cliente}
+          onChange={e => setFilters(f => ({ ...f, cliente: e.target.value }))}
+          className="h-8 w-40 text-xs"
+        />
+        <Select value={filters.status} onValueChange={v => setFilters(f => ({ ...f, status: v }))}>
+          <SelectTrigger className="h-8 w-32 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todos">Todos os status</SelectItem>
+            <SelectItem value="pendente">Pendente</SelectItem>
+            <SelectItem value="validado">Aprovado</SelectItem>
+            <SelectItem value="rejeitado">Rejeitado</SelectItem>
+          </SelectContent>
+        </Select>
+        <Input
+          type="date"
+          value={filters.dataInicio}
+          onChange={e => setFilters(f => ({ ...f, dataInicio: e.target.value }))}
+          className="h-8 w-36 text-xs"
+        />
+        <Input
+          type="date"
+          value={filters.dataFim}
+          onChange={e => setFilters(f => ({ ...f, dataFim: e.target.value }))}
+          className="h-8 w-36 text-xs"
+        />
+        {(filters.motorista || filters.cliente || filters.status !== "todos" || filters.dataInicio || filters.dataFim) && (
+          <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => setFilters({ motorista: "", cliente: "", status: "todos", dataInicio: "", dataFim: "" })}>
+            Limpar
+          </Button>
+        )}
+      </div>
+
+      {/* Bulk actions bar */}
+      {selectedIds.size > 0 && (
+        <div className="flex items-center justify-between px-4 py-2 rounded-lg bg-primary/10 border border-primary/20">
+          <div className="flex items-center gap-2 text-xs">
+            <CheckSquare className="w-4 h-4 text-primary" />
+            <span className="text-foreground font-medium">{selectedIds.size} selecionado{selectedIds.size > 1 ? "s" : ""}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" className="h-8 text-xs gap-1" onClick={bulkSendWhatsApp}>
+              <MessageCircle className="w-3 h-3" /> WhatsApp
+            </Button>
+            <Button size="sm" variant="outline" className="h-8 text-xs gap-1" onClick={() => setBulkRejectModal(true)}>
+              <XCircle className="w-3 h-3" /> Rejeitar
+            </Button>
+            <Button size="sm" className="h-8 text-xs gap-1" onClick={bulkApprove} disabled={processing === -1}>
+              {processing === -1 ? <RefreshCw className="w-3 h-3 animate-spin" /> : <><CheckCircle2 className="w-3 h-3" /> Aprovar</>}
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* ── Aguardando Canhoto do Motorista ───────────────────────────────────── */}
       {pendingViagens.length > 0 && (
@@ -361,83 +518,104 @@ export default function Aprovacao() {
               <p className="text-xs text-muted-foreground mt-1">Todos os canhotos foram processados.</p>
             </div>
           ) : (
-            canhotos.map(c => (
-              <div
-                key={c.id}
-                className={`bg-card border rounded-lg overflow-hidden cursor-pointer transition-all duration-200 ${
-                  c.fraudAlert ? "border-red-500/40" :
-                  selectedId === c.id ? "border-primary shadow-[0_0_0_1px_rgba(60,130,246,0.3)]" : "border-border hover:border-white/20"
-                }`}
-                onClick={() => setSelectedId(c.id === selectedId ? null : c.id)}
-              >
-                {c.fraudAlert && (
-                  <div className="px-4 py-1.5 flex items-center gap-1.5 text-[10px] font-medium text-red-300" style={{ backgroundColor: "rgba(239,68,68,0.08)" }}>
-                    <AlertTriangle className="w-3 h-3 text-red-400 shrink-0" />
-                    ALERTA DE FRAUDE — Motorista estava a {c.fraudDistanciaMetros ?? "?"}m do endereço esperado
-                  </div>
-                )}
-                <div className="px-4 py-3 flex items-center gap-3">
-                  <div className={`w-2 h-2 rounded-full shrink-0 ${c.fraudAlert ? "bg-red-400" : c.status === "pendente" ? "bg-amber-400" : "bg-success"}`} />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="text-xs font-mono font-bold text-foreground">{c.numeroNF ?? `Canhoto #${c.id}`}</p>
-                      <StatusBadge status={c.status} fraudAlert={c.fraudAlert} />
-                      {c.iaConfidencia != null && (
-                        <span className={`text-[9px] font-mono ${c.iaConfidencia >= 0.85 ? "text-success" : "text-amber-400"}`}>
-                          IA: {(c.iaConfidencia * 100).toFixed(0)}%
-                        </span>
+            <>
+              <div className="flex items-center gap-2 px-2 py-1 text-xs text-muted-foreground">
+                <Checkbox
+                  checked={selectedIds.size === filteredCanhotos.length && filteredCanhotos.length > 0}
+                  onCheckedChange={toggleSelectAll}
+                />
+                <span>Selecionar todos ({filteredCanhotos.length})</span>
+              </div>
+              {filteredCanhotos.map(c => (
+                <div
+                  key={c.id}
+                  className={`bg-card border rounded-lg overflow-hidden cursor-pointer transition-all duration-200 ${
+                    c.fraudAlert ? "border-red-500/40" :
+                    selectedId === c.id ? "border-primary shadow-[0_0_0_1px_rgba(60,130,246,0.3)]" : "border-border hover:border-white/20"
+                  }`}
+                  onClick={() => setSelectedId(c.id === selectedId ? null : c.id)}
+                >
+                  {c.fraudAlert && (
+                    <div className="px-4 py-1.5 flex items-center gap-1.5 text-[10px] font-medium text-red-300" style={{ backgroundColor: "rgba(239,68,68,0.08)" }}>
+                      <AlertTriangle className="w-3 h-3 text-red-400 shrink-0" />
+                      ALERTA DE FRAUDE — Motorista estava a {c.fraudDistanciaMetros ?? "?"}m do endereço esperado
+                    </div>
+                  )}
+                  <div className="px-4 py-3 flex items-center gap-3">
+                    <Checkbox
+                      checked={selectedIds.has(c.id)}
+                      onCheckedChange={() => toggleSelect(c.id)}
+                      onClick={e => e.stopPropagation()}
+                    />
+                    <div className={`w-2 h-2 rounded-full shrink-0 ${c.fraudAlert ? "bg-red-400" : c.status === "pendente" ? "bg-amber-400" : "bg-success"}`} />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-xs font-mono font-bold text-foreground">{c.numeroNF ?? `Canhoto #${c.id}`}</p>
+                        <StatusBadge status={c.status} fraudAlert={c.fraudAlert} />
+                        {c.iaConfidencia != null && (
+                          <span className={`text-[9px] font-mono ${c.iaConfidencia >= 0.85 ? "text-success" : "text-amber-400"}`}>
+                            IA: {(c.iaConfidencia * 100).toFixed(0)}%
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[10px] text-muted-foreground mt-0.5 truncate">
+                        {c.motoristaNome ?? "Motorista"} · {c.clienteNome ?? "Cliente desconhecido"}
+                      </p>
+                      {c.valorFrete && (
+                        <p className="text-xs font-semibold text-success mt-0.5">{formatCurrency(c.valorFrete)}</p>
                       )}
                     </div>
-                    <p className="text-[10px] text-muted-foreground mt-0.5 truncate">
-                      {c.motoristaNome ?? "Motorista"} · {c.clienteNome ?? "Cliente desconhecido"}
-                    </p>
-                    {c.valorFrete && (
-                      <p className="text-xs font-semibold text-success mt-0.5">{formatCurrency(c.valorFrete)}</p>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <button
-                      className="w-7 h-7 rounded flex items-center justify-center hover:bg-green-500/15 transition-colors"
-                      onClick={e => { e.stopPropagation(); sendToWhatsApp(c.viagemId); }}
-                      title="Enviar para o Motorista via WhatsApp"
-                    >
-                      <MessageCircle className="w-3.5 h-3.5 text-green-500" />
-                    </button>
-                    <button
-                      className="w-7 h-7 rounded flex items-center justify-center hover:bg-white/8 transition-colors"
-                      onClick={e => { e.stopPropagation(); openEdit(c); }}
-                      title="Editar dados"
-                    >
-                      <Edit3 className="w-3.5 h-3.5 text-muted-foreground" />
-                    </button>
-                    <button
-                      className="w-7 h-7 rounded flex items-center justify-center hover:bg-primary/10 transition-colors"
-                      onClick={e => { e.stopPropagation(); downloadPDF(c); }}
-                      disabled={generatingPdf === c.id}
-                      title="Baixar PDF"
-                    >
-                      {generatingPdf === c.id ? <RefreshCw className="w-3.5 h-3.5 text-primary animate-spin" /> : <Download className="w-3.5 h-3.5 text-primary" />}
-                    </button>
-                    <button
-                      className="w-7 h-7 rounded flex items-center justify-center hover:bg-success/10 transition-colors"
-                      onClick={e => { e.stopPropagation(); approve(c.id); }}
-                      disabled={processing === c.id}
-                      title="Aprovar"
-                    >
-                      {processing === c.id ? <RefreshCw className="w-3.5 h-3.5 text-success animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5 text-success" />}
-                    </button>
-                    <button
-                      className="w-7 h-7 rounded flex items-center justify-center hover:bg-destructive/10 transition-colors"
-                      onClick={e => { e.stopPropagation(); reject(c.id); }}
-                      disabled={processing === c.id}
-                      title="Rejeitar"
-                    >
-                      <XCircle className="w-3.5 h-3.5 text-destructive" />
-                    </button>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        className="w-7 h-7 rounded flex items-center justify-center hover:bg-green-500/15 transition-colors"
+                        onClick={e => { e.stopPropagation(); sendToWhatsApp(c.viagemId); }}
+                        title="Enviar para o Motorista via WhatsApp"
+                      >
+                        <MessageCircle className="w-3.5 h-3.5 text-green-500" />
+                      </button>
+                      <button
+                        className="w-7 h-7 rounded flex items-center justify-center hover:bg-white/8 transition-colors"
+                        onClick={e => { e.stopPropagation(); openEdit(c); }}
+                        title="Editar dados"
+                      >
+                        <Edit3 className="w-3.5 h-3.5 text-muted-foreground" />
+                      </button>
+                      <button
+                        className="w-7 h-7 rounded flex items-center justify-center hover:bg-primary/10 transition-colors"
+                        onClick={e => { e.stopPropagation(); downloadPDF(c); }}
+                        disabled={generatingPdf === c.id}
+                        title="Baixar PDF"
+                      >
+                        {generatingPdf === c.id ? <RefreshCw className="w-3.5 h-3.5 text-primary animate-spin" /> : <Download className="w-3.5 h-3.5 text-primary" />}
+                      </button>
+                      <button
+                        className="w-7 h-7 rounded flex items-center justify-center hover:bg-success/10 transition-colors"
+                        onClick={e => {
+                          e.stopPropagation();
+                          if (c.fraudAlert) {
+                            setFraudConfirmModal(c);
+                          } else {
+                            approve(c.id);
+                          }
+                        }}
+                        disabled={processing === c.id}
+                        title="Aprovar"
+                      >
+                        {processing === c.id ? <RefreshCw className="w-3.5 h-3.5 text-success animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5 text-success" />}
+                      </button>
+                      <button
+                        className="w-7 h-7 rounded flex items-center justify-center hover:bg-destructive/10 transition-colors"
+                        onClick={e => { e.stopPropagation(); setRejectModal(c); setRejectReason(""); }}
+                        disabled={processing === c.id}
+                        title="Rejeitar"
+                      >
+                        <XCircle className="w-3.5 h-3.5 text-destructive" />
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))
+              ))}
+            </>
           )}
         </div>
 
@@ -560,15 +738,21 @@ export default function Aprovacao() {
                   <Button
                     className="flex-1 h-9 text-xs font-semibold border-destructive/30 text-destructive bg-transparent hover:bg-destructive/8"
                     variant="outline"
-                    onClick={() => reject(selected.id)}
+                    onClick={() => { setRejectModal(selected); setRejectReason(""); }}
                     disabled={processing === selected.id}
                   >
                     <XCircle className="w-3.5 h-3.5 mr-1.5" /> Rejeitar
                   </Button>
                   <Button
                     className="flex-1 h-9 text-xs font-semibold"
-                    style={{ background: "linear-gradient(135deg, #16a34a, #4ADE80)", color: "#000" }}
-                    onClick={() => approve(selected.id)}
+                    style={{ background: selected.fraudAlert ? "linear-gradient(135deg, #ef4444, #dc2626)" : "linear-gradient(135deg, #16a34a, #4ADE80)", color: "#000" }}
+                    onClick={() => {
+                      if (selected.fraudAlert) {
+                        setFraudConfirmModal(selected);
+                      } else {
+                        approve(selected.id);
+                      }
+                    }}
                     disabled={processing === selected.id}
                   >
                     {processing === selected.id ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <><CheckCircle2 className="w-3.5 h-3.5 mr-1.5" /> Aprovar</>}
@@ -604,7 +788,7 @@ export default function Aprovacao() {
                 <h3 className="text-sm font-semibold text-foreground">Corrigir Dados do Canhoto</h3>
               </div>
               <button onClick={() => setEditModal(null)} className="w-7 h-7 rounded flex items-center justify-center hover:bg-white/8">
-                <X className="w-4 h-4 text-muted-foreground" />
+                <X className="w-4 w-4 text-muted-foreground" />
               </button>
             </div>
             <div className="px-6 py-5 space-y-4">
@@ -612,12 +796,15 @@ export default function Aprovacao() {
               {[
                 { key: "numeroNF", label: "Número da Nota Fiscal", placeholder: "NF-2026-04521" },
                 { key: "cnpjCliente", label: "CNPJ do Cliente", placeholder: "00.000.000/0001-00" },
+                { key: "valorFrete", label: "Valor do Frete", placeholder: "1500.00", type: "number" },
+                { key: "motoristaNome", label: "Nome do Motorista", placeholder: "João Silva" },
                 { key: "observacoes", label: "Observações", placeholder: "Ex.: Entrega parcial, 3 volumes recusados..." },
-              ].map(({ key, label, placeholder }) => (
+              ].map(({ key, label, placeholder, type }) => (
                 <div key={key} className="space-y-1.5">
                   <Label className="text-xs text-muted-foreground">{label}</Label>
                   <Input
                     className="h-9 text-sm bg-background border-border"
+                    type={type || "text"}
                     placeholder={placeholder}
                     value={(editForm as any)[key]}
                     onChange={e => setEditForm(p => ({ ...p, [key]: e.target.value }))}
@@ -629,6 +816,155 @@ export default function Aprovacao() {
               <Button variant="outline" className="flex-1 h-9 text-sm border-border text-muted-foreground" onClick={() => setEditModal(null)}>Cancelar</Button>
               <Button className="flex-1 h-9 text-sm font-semibold" style={{ background: "linear-gradient(135deg, #2563EB, #3C82F6)" }} onClick={saveEdit} disabled={saving}>
                 {saving ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <><ShieldCheck className="w-3.5 h-3.5 mr-1.5" /> Salvar</>}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reject Modal with Reason */}
+      {rejectModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: "rgba(0,0,0,0.75)" }}>
+          <div className="bg-card border border-border rounded-xl w-full max-w-sm shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="px-6 py-4 border-b border-border flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <XCircle className="w-4 h-4 text-destructive" />
+                <h3 className="text-sm font-semibold text-foreground">Rejeitar Canhoto</h3>
+              </div>
+              <button onClick={() => setRejectModal(null)} className="w-7 h-7 rounded flex items-center justify-center hover:bg-white/8">
+                <X className="w-4 w-4 text-muted-foreground" />
+              </button>
+            </div>
+            <div className="px-6 py-5 space-y-4">
+              <p className="text-xs text-muted-foreground">Informe o motivo da rejeição. Este será registrado no histórico.</p>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Motivo</Label>
+                <Select value={rejectReason} onValueChange={setRejectReason}>
+                  <SelectTrigger className="h-9 text-sm">
+                    <SelectValue placeholder="Selecione o motivo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Foto borrada ou ilegível">Foto borrada ou ilegível</SelectItem>
+                    <SelectItem value="Dados incorretos na nota fiscal">Dados incorretos na nota fiscal</SelectItem>
+                    <SelectItem value="Suspeita de fraude (GPS fora do local)">Suspeita de fraude (GPS fora do local)</SelectItem>
+                    <SelectItem value="Assinatura não detectada">Assinatura não detectada</SelectItem>
+                    <SelectItem value="Entrega não realizada">Entrega não realizada</SelectItem>
+                    <SelectItem value="Outro">Outro</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {rejectReason === "Outro" && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Descreva o motivo</Label>
+                  <Input
+                    className="h-9 text-sm bg-background border-border"
+                    placeholder="Detalhes adicionais..."
+                    value={rejectReason === "Outro" ? (editForm as any).observacoes : ""}
+                    onChange={e => setEditForm(p => ({ ...p, observacoes: e.target.value }))}
+                  />
+                </div>
+              )}
+            </div>
+            <div className="px-6 pb-5 flex gap-3">
+              <Button variant="outline" className="flex-1 h-9 text-sm border-border text-muted-foreground" onClick={() => setRejectModal(null)}>Cancelar</Button>
+              <Button
+                className="flex-1 h-9 text-sm font-semibold bg-destructive hover:bg-destructive/90"
+                onClick={() => reject(rejectModal.id, rejectReason === "Outro" ? (editForm as any).observacoes || "Outro" : rejectReason)}
+                disabled={!rejectReason || (rejectReason === "Outro" && !(editForm as any).observacoes)}
+              >
+                {processing === rejectModal.id ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <><XCircle className="w-3.5 h-3.5 mr-1.5" /> Rejeitar</>}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Reject Modal */}
+      {bulkRejectModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: "rgba(0,0,0,0.75)" }}>
+          <div className="bg-card border border-border rounded-xl w-full max-w-sm shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="px-6 py-4 border-b border-border flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <XCircle className="w-4 h-4 text-destructive" />
+                <h3 className="text-sm font-semibold text-foreground">Rejeitar em Lote ({selectedIds.size})</h3>
+              </div>
+              <button onClick={() => setBulkRejectModal(false)} className="w-7 h-7 rounded flex items-center justify-center hover:bg-white/8">
+                <X className="w-4 w-4 text-muted-foreground" />
+              </button>
+            </div>
+            <div className="px-6 py-5 space-y-4">
+              <p className="text-xs text-muted-foreground">Informe o motivo da rejeição em lote. Este será aplicado a todos os canhotos selecionados.</p>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Motivo</Label>
+                <Select value={bulkRejectReason} onValueChange={setBulkRejectReason}>
+                  <SelectTrigger className="h-9 text-sm">
+                    <SelectValue placeholder="Selecione o motivo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Foto borrada ou ilegível">Foto borrada ou ilegível</SelectItem>
+                    <SelectItem value="Dados incorretos na nota fiscal">Dados incorretos na nota fiscal</SelectItem>
+                    <SelectItem value="Suspeita de fraude (GPS fora do local)">Suspeita de fraude (GPS fora do local)</SelectItem>
+                    <SelectItem value="Assinatura não detectada">Assinatura não detectada</SelectItem>
+                    <SelectItem value="Entrega não realizada">Entrega não realizada</SelectItem>
+                    <SelectItem value="Outro">Outro</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="px-6 pb-5 flex gap-3">
+              <Button variant="outline" className="flex-1 h-9 text-sm border-border text-muted-foreground" onClick={() => setBulkRejectModal(false)}>Cancelar</Button>
+              <Button
+                className="flex-1 h-9 text-sm font-semibold bg-destructive hover:bg-destructive/90"
+                onClick={bulkReject}
+                disabled={!bulkRejectReason || processing === -1}
+              >
+                {processing === -1 ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <><XCircle className="w-3.5 h-3.5 mr-1.5" /> Rejeitar {selectedIds.size}</>}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Fraud Confirm Modal */}
+      {fraudConfirmModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: "rgba(0,0,0,0.75)" }}>
+          <div className="bg-card border border-red-500/30 rounded-xl w-full max-w-sm shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="px-6 py-4 border-b border-red-500/20 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-red-400" />
+                <h3 className="text-sm font-semibold text-red-300">Alerta de Fraude Detectado</h3>
+              </div>
+              <button onClick={() => setFraudConfirmModal(null)} className="w-7 h-7 rounded flex items-center justify-center hover:bg-white/8">
+                <X className="w-4 w-4 text-muted-foreground" />
+              </button>
+            </div>
+            <div className="px-6 py-5 space-y-4">
+              <div className="flex items-start gap-3 p-3 rounded-lg bg-red-500/10 border border-red-500/20">
+                <AlertTriangle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
+                <div className="text-xs">
+                  <p className="font-semibold text-red-300">GPS fora do endereço esperado</p>
+                  <p className="text-red-400/80 mt-1">
+                    Motorista estava a <strong>{fraudConfirmModal.fraudDistanciaMetros ?? "?"}m</strong> do endereço de entrega (limite: 500m).
+                  </p>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Tem certeza que deseja aprovar este canhoto mesmo com o alerta de fraude? Revise o GPS e a foto antes de confirmar.
+              </p>
+            </div>
+            <div className="px-6 pb-5 flex gap-3">
+              <Button variant="outline" className="flex-1 h-9 text-sm border-border text-muted-foreground" onClick={() => setFraudConfirmModal(null)}>
+                Cancelar
+              </Button>
+              <Button
+                className="flex-1 h-9 text-sm font-semibold bg-red-500 hover:bg-red-600"
+                onClick={() => {
+                  approve(fraudConfirmModal.id);
+                  setFraudConfirmModal(null);
+                }}
+                disabled={processing === fraudConfirmModal.id}
+              >
+                {processing === fraudConfirmModal.id ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <><AlertTriangle className="w-3.5 h-3.5 mr-1.5" /> Aprovar Mesmo Assim</>}
               </Button>
             </div>
           </div>
