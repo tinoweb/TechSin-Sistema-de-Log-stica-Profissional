@@ -1,17 +1,18 @@
 import { Router, type IRouter } from "express";
 import { db, viagensTable, motoristasTable, clientesTable, xmlsTable } from "@workspace/db";
 import { eq, and, isNotNull, isNull } from "drizzle-orm";
+import { resolveTenantId, requireTenantId, TenantScopeError } from "../lib/tenant-scope";
 
 const router: IRouter = Router();
 
 router.get("/viagens", async (req, res) => {
   try {
-    const transportadoraId = req.query.transportadoraId ? parseInt(req.query.transportadoraId as string) : undefined;
+    const transportadoraId = resolveTenantId(req);
     const motoristaId = req.query.motoristaId ? parseInt(req.query.motoristaId as string) : undefined;
     const status = req.query.status as string | undefined;
 
     const conditions = [];
-    if (transportadoraId) conditions.push(eq(viagensTable.transportadoraId, transportadoraId));
+    if (typeof transportadoraId === "number") conditions.push(eq(viagensTable.transportadoraId, transportadoraId));
     if (motoristaId) conditions.push(eq(viagensTable.motoristaId, motoristaId));
     if (status) conditions.push(eq(viagensTable.status, status as any));
 
@@ -39,7 +40,10 @@ router.get("/viagens", async (req, res) => {
 
 router.post("/viagens", async (req, res) => {
   try {
-    const { transportadoraId, motoristaId, clienteId, numeroNF, valorFrete, origem, destino, dataPartida } = req.body;
+    let transportadoraId: number;
+    try { transportadoraId = requireTenantId(req); }
+    catch (e) { if (e instanceof TenantScopeError) return res.status(400).json({ error: e.message }); throw e; }
+    const { motoristaId, clienteId, numeroNF, valorFrete, origem, destino, dataPartida } = req.body;
     const [created] = await db.insert(viagensTable).values({
       transportadoraId,
       motoristaId,
@@ -66,17 +70,15 @@ router.post("/viagens", async (req, res) => {
 /* ── Viagens pendentes de canhoto (criadas por upload, sem canhoto ainda) ── */
 router.get("/viagens/pendentes-canhoto", async (req, res) => {
   try {
-    const transportadoraId = req.query.transportadoraId
-      ? parseInt(req.query.transportadoraId as string)
-      : 1;
-
-    const rows = await db.select().from(viagensTable).where(
-      and(
-        eq(viagensTable.transportadoraId, transportadoraId),
-        eq(viagensTable.status, "pendente"),
-        isNull(viagensTable.canhotoId),
-      )
-    );
+    const transportadoraId = resolveTenantId(req);
+    const baseConditions = [
+      eq(viagensTable.status, "pendente"),
+      isNull(viagensTable.canhotoId),
+    ];
+    if (typeof transportadoraId === "number") {
+      baseConditions.push(eq(viagensTable.transportadoraId, transportadoraId));
+    }
+    const rows = await db.select().from(viagensTable).where(and(...baseConditions));
 
     const enriched = await Promise.all(rows.map(async (v) => {
       const [motorista] = v.motoristaId

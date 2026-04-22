@@ -1,8 +1,45 @@
-import { Link } from "wouter";
-import { ArrowRight, Truck, Shield, Zap } from "lucide-react";
+import { Link, useLocation } from "wouter";
+import { useEffect, useState, type FormEvent } from "react";
+import { ArrowRight, Truck, Shield, Zap, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/hooks/use-auth";
 
 export default function Login() {
+  const { user, loading, login } = useAuth();
+  const [, setLocation] = useLocation();
+  const [email, setEmail] = useState("");
+  const [senha, setSenha] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+
+  /* Se ja esta autenticado, pula direto para o dashboard (ou super-admin). */
+  useEffect(() => {
+    if (!loading && user) {
+      setLocation(user.role === "superadmin" ? "/super-admin" : "/dashboard");
+    }
+  }, [loading, user, setLocation]);
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setErro(null);
+    setSubmitting(true);
+    try {
+      await login(email.trim(), senha);
+      /* Redirect acontece via useEffect quando o user for setado. */
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Falha ao entrar";
+      /* A mensagem do backend vem como JSON; extraimos o "error" se houver. */
+      try {
+        const parsed = JSON.parse(msg);
+        setErro(parsed.error ?? msg);
+      } catch {
+        setErro(msg);
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   return (
     <div className="min-h-screen flex" style={{ backgroundColor: "hsl(0 0% 10%)" }}>
       {/* Brand panel */}
@@ -65,34 +102,47 @@ export default function Login() {
             <p className="text-sm text-muted-foreground">Insira suas credenciais corporativas para continuar.</p>
           </div>
 
-          <div className="space-y-4 mb-6">
+          <form onSubmit={handleSubmit} className="space-y-4 mb-6">
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-foreground">E-mail corporativo</label>
               <input
                 type="email"
+                autoComplete="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 className="w-full bg-card border border-border rounded px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30 transition-all"
-                defaultValue="admin@techsin.com.br"
+                placeholder="voce@empresa.com.br"
               />
             </div>
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-medium text-foreground">Senha</label>
-                <a href="#" className="text-xs text-primary hover:text-primary/80 transition-colors">Esqueceu?</a>
               </div>
               <input
                 type="password"
+                autoComplete="current-password"
+                required
+                value={senha}
+                onChange={(e) => setSenha(e.target.value)}
                 className="w-full bg-card border border-border rounded px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30 transition-all"
-                defaultValue="admin123"
               />
             </div>
-          </div>
 
-          <Link href="/dashboard">
-            <Button className="w-full h-10 font-medium group text-sm">
-              Entrar no Sistema
-              <ArrowRight className="ml-2 w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+            {erro && (
+              <div className="text-xs text-red-400 bg-red-950/40 border border-red-900/50 rounded px-3 py-2">
+                {erro}
+              </div>
+            )}
+
+            <Button type="submit" disabled={submitting} className="w-full h-10 font-medium group text-sm">
+              {submitting ? (
+                <><Loader2 className="mr-2 w-4 h-4 animate-spin" /> Entrando...</>
+              ) : (
+                <>Entrar no Sistema <ArrowRight className="ml-2 w-4 h-4 group-hover:translate-x-0.5 transition-transform" /></>
+              )}
             </Button>
-          </Link>
+          </form>
 
           <div className="mt-6 pt-6 border-t border-border text-center">
             <p className="text-xs text-muted-foreground mb-3">Acesso para motoristas</p>

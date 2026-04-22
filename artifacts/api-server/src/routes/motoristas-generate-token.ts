@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { db, motoristasTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { randomBytes } from "crypto";
+import { resolveTenantId, requireTenantId, TenantScopeError } from "../lib/tenant-scope";
 
 const router: IRouter = Router();
 
@@ -9,13 +10,17 @@ const router: IRouter = Router();
 router.post("/motoristas/:id/generate-token", async (req, res) => {
   try {
     const motoristaId = parseInt(req.params.id);
-    
+    const tenantId = resolveTenantId(req);
+
     // Verificar se motorista existe
     const [motorista] = await db.select().from(motoristasTable)
       .where(eq(motoristasTable.id, motoristaId));
-    
+
     if (!motorista) {
       return res.status(404).json({ error: "Motorista não encontrado" });
+    }
+    if (typeof tenantId === "number" && motorista.transportadoraId !== tenantId) {
+      return res.status(403).json({ error: "Motorista nao pertence a sua empresa" });
     }
 
     // Gerar novo token único
@@ -50,7 +55,9 @@ router.post("/motoristas/:id/generate-token", async (req, res) => {
 // Gerar tokens para todos os motoristas sem token
 router.post("/motoristas/generate-all-tokens", async (req, res) => {
   try {
-    const transportadoraId = req.body.transportadoraId || 1;
+    let transportadoraId: number;
+    try { transportadoraId = requireTenantId(req); }
+    catch (e) { if (e instanceof TenantScopeError) return res.status(400).json({ error: e.message }); throw e; }
     
     // Buscar motoristas sem token
     const motoristas = await db.select().from(motoristasTable)

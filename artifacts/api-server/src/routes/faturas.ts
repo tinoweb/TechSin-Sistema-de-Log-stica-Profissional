@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { db, faturasTable, clientesTable, viagensTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { randomUUID } from "crypto";
+import { resolveTenantId, requireTenantId, TenantScopeError } from "../lib/tenant-scope";
 
 const router: IRouter = Router();
 
@@ -16,10 +17,10 @@ function parseFatura(f: any) {
 
 router.get("/faturas", async (req, res) => {
   try {
-    const transportadoraId = req.query.transportadoraId ? parseInt(req.query.transportadoraId as string) : undefined;
+    const transportadoraId = resolveTenantId(req);
     const status = req.query.status as string | undefined;
 
-    let rows = transportadoraId
+    let rows = typeof transportadoraId === "number"
       ? await db.select().from(faturasTable).where(eq(faturasTable.transportadoraId, transportadoraId))
       : await db.select().from(faturasTable);
 
@@ -39,7 +40,10 @@ router.get("/faturas", async (req, res) => {
 
 router.post("/faturas", async (req, res) => {
   try {
-    const { transportadoraId, clienteId, viagemId, canhotoId, xmlId, valor, dataVencimento } = req.body;
+    let transportadoraId: number;
+    try { transportadoraId = requireTenantId(req); }
+    catch (e) { if (e instanceof TenantScopeError) return res.status(400).json({ error: e.message }); throw e; }
+    const { clienteId, viagemId, canhotoId, xmlId, valor, dataVencimento } = req.body;
     const numeroFatura = `FAT-${Date.now().toString(36).toUpperCase()}`;
 
     const [created] = await db.insert(faturasTable).values({

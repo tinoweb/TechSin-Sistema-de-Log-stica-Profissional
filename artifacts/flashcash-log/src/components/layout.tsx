@@ -14,8 +14,10 @@ import {
   ChevronDown,
   Server,
   ClipboardCheck,
-  Archive
+  Archive,
+  ShieldCheck
 } from "lucide-react";
+import { useAuth } from "@/hooks/use-auth";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard Executivo", icon: BarChart3 },
@@ -40,11 +42,25 @@ const TIMEZONES = [
 const CURRENCIES = ["BRL", "USD", "EUR"];
 
 export default function Layout({ children }: { children: React.ReactNode }) {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   const [timezone, setTimezone] = useState("America/Sao_Paulo");
   const [currency, setCurrency] = useState("BRL");
   const [tzOpen, setTzOpen] = useState(false);
   const [curOpen, setCurOpen] = useState(false);
+  const { user, logout } = useAuth();
+
+  async function handleLogout() {
+    await logout();
+    setLocation("/");
+  }
+
+  /* Iniciais para avatar (ex.: "Jo\u00e3o Silva" -> "JS"). */
+  const iniciais = user?.nome
+    ?.split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((n) => n[0]?.toUpperCase())
+    .join("") || "??";
 
   const currentTime = new Date().toLocaleTimeString("pt-BR", {
     timeZone: timezone,
@@ -114,13 +130,23 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <Server className="w-3.5 h-3.5 shrink-0" />
             <span className="truncate">TechSin · v3.0.0</span>
           </div>
-          <Link
-            href="/"
-            className="flex items-center gap-2.5 px-3 py-2 rounded text-sm text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+          {user?.role === "superadmin" && (
+            <Link
+              href="/super-admin"
+              className="flex items-center gap-2.5 px-3 py-2 rounded text-sm text-muted-foreground hover:bg-primary/10 hover:text-primary transition-colors mb-1"
+            >
+              <ShieldCheck className="w-4 h-4 shrink-0" />
+              Super Admin
+            </Link>
+          )}
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="w-full flex items-center gap-2.5 px-3 py-2 rounded text-sm text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
           >
             <LogOut className="w-4 h-4 shrink-0" />
             Sair do Sistema
-          </Link>
+          </button>
         </div>
       </aside>
 
@@ -190,9 +216,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               <span className="hidden sm:inline">Online</span>
             </div>
 
-            {/* User avatar */}
-            <div className="w-7 h-7 rounded-full border border-border bg-card flex items-center justify-center text-[10px] font-bold text-foreground">
-              AD
+            {/* User badge */}
+            <div className="flex items-center gap-2">
+              <div className="hidden md:flex flex-col items-end leading-tight">
+                <span className="text-[11px] font-medium text-foreground truncate max-w-[160px]">{user?.nome ?? "Convidado"}</span>
+                <span className="text-[10px] text-muted-foreground uppercase">{user?.role ?? ""}</span>
+              </div>
+              <div className="w-7 h-7 rounded-full border border-border bg-card flex items-center justify-center text-[10px] font-bold text-foreground" title={user?.email}>
+                {iniciais}
+              </div>
             </div>
           </div>
         </header>

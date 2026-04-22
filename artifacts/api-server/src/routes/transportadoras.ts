@@ -1,12 +1,18 @@
 import { Router, type IRouter } from "express";
 import { db, transportadorasTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
+import { resolveTenantId } from "../lib/tenant-scope";
 
 const router: IRouter = Router();
 
+/* Admin/operador/financeiro: retorna apenas a propria transportadora.
+ * Superadmin: retorna todas (para o painel global). */
 router.get("/transportadoras", async (req, res) => {
   try {
-    const rows = await db.select().from(transportadorasTable);
+    const tenantId = resolveTenantId(req);
+    const rows = typeof tenantId === "number"
+      ? await db.select().from(transportadorasTable).where(eq(transportadorasTable.id, tenantId))
+      : await db.select().from(transportadorasTable);
     res.json(rows);
   } catch (err) {
     req.log.error({ err }, "Error listing transportadoras");
@@ -14,7 +20,12 @@ router.get("/transportadoras", async (req, res) => {
   }
 });
 
+/* Criacao de nova transportadora e operacao exclusiva do superadmin
+ * (ja protegida por /super-admin via requireSuperAdmin no router index). */
 router.post("/transportadoras", async (req, res) => {
+  if (req.user?.role !== "superadmin") {
+    return res.status(403).json({ error: "Apenas superadmin pode criar transportadoras" });
+  }
   try {
     const { nome, cnpj, email, telefone, emailFinanceiro } = req.body;
     const [created] = await db.insert(transportadorasTable).values({
@@ -38,6 +49,16 @@ router.patch("/transportadoras/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     if (Number.isNaN(id)) return res.status(400).json({ error: "id inválido" });
+
+    const tenantId = resolveTenantId(req);
+    if (typeof tenantId === "number" && tenantId !== id) {
+      return res.status(403).json({ error: "Nao pode editar outra empresa" });
+    }
+    /* Apenas superadmin pode alterar ativo/plano. */
+    if (req.user?.role !== "superadmin") {
+      delete (req.body as any).ativo;
+      delete (req.body as any).plano;
+    }
 
     const { nome, cnpj, email, telefone, emailFinanceiro, emailRemetente, ativo, plano } = req.body as Record<string, unknown>;
 
@@ -72,6 +93,10 @@ router.patch("/transportadoras/:id", async (req, res) => {
 router.get("/transportadoras/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
+    const tenantId = resolveTenantId(req);
+    if (typeof tenantId === "number" && tenantId !== id) {
+      return res.status(403).json({ error: "Acesso negado" });
+    }
     const [row] = await db.select().from(transportadorasTable).where(eq(transportadorasTable.id, id));
     if (!row) return res.status(404).json({ error: "Not found" });
     res.json(row);

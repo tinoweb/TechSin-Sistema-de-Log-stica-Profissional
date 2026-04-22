@@ -1,16 +1,16 @@
 import { Router, type IRouter } from "express";
 import { db, motoristasTable, viagensTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
+import { resolveTenantId, requireTenantId, TenantScopeError } from "../lib/tenant-scope";
 
 const router: IRouter = Router();
 
 router.get("/motoristas", async (req, res) => {
   try {
-    const transportadoraId = req.query.transportadoraId ? parseInt(req.query.transportadoraId as string) : undefined;
-    let query = db.select().from(motoristasTable);
-    const rows = transportadoraId
-      ? await query.where(eq(motoristasTable.transportadoraId, transportadoraId))
-      : await query;
+    const transportadoraId = resolveTenantId(req); // number | null (superadmin=todos) | undefined
+    const rows = typeof transportadoraId === "number"
+      ? await db.select().from(motoristasTable).where(eq(motoristasTable.transportadoraId, transportadoraId))
+      : await db.select().from(motoristasTable);
     res.json(rows);
   } catch (err) {
     req.log.error({ err }, "Error listing motoristas");
@@ -20,12 +20,14 @@ router.get("/motoristas", async (req, res) => {
 
 router.post("/motoristas", async (req, res) => {
   try {
-    const { transportadoraId, nome, cpf, telefone, email, cnh } = req.body;
+    const transportadoraId = requireTenantId(req);
+    const { nome, cpf, telefone, email, cnh } = req.body;
     const [created] = await db.insert(motoristasTable).values({
       transportadoraId, nome, cpf, telefone, email, cnh, status: "ativo",
     }).returning();
     res.status(201).json(created);
   } catch (err) {
+    if (err instanceof TenantScopeError) return res.status(400).json({ error: err.message });
     req.log.error({ err }, "Error creating motorista");
     res.status(500).json({ error: "Internal server error" });
   }
@@ -50,7 +52,11 @@ router.get("/motoristas/by-token/:token", async (req, res) => {
 router.get("/motoristas/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    const [row] = await db.select().from(motoristasTable).where(eq(motoristasTable.id, id));
+    const tenantId = resolveTenantId(req);
+    const where = typeof tenantId === "number"
+      ? and(eq(motoristasTable.id, id), eq(motoristasTable.transportadoraId, tenantId))
+      : eq(motoristasTable.id, id);
+    const [row] = await db.select().from(motoristasTable).where(where);
     if (!row) return res.status(404).json({ error: "Not found" });
     res.json(row);
   } catch (err) {

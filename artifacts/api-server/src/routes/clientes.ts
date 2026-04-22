@@ -1,16 +1,16 @@
 import { Router, type IRouter } from "express";
 import { db, clientesTable, transportadorasTable, viagensTable, faturasTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
+import { resolveTenantId, requireTenantId, TenantScopeError } from "../lib/tenant-scope";
 
 const router: IRouter = Router();
 
 router.get("/clientes", async (req, res) => {
   try {
-    const transportadoraId = req.query.transportadoraId ? parseInt(req.query.transportadoraId as string) : undefined;
-    let query = db.select().from(clientesTable);
-    const rows = transportadoraId
-      ? await query.where(eq(clientesTable.transportadoraId, transportadoraId))
-      : await query;
+    const transportadoraId = resolveTenantId(req);
+    const rows = typeof transportadoraId === "number"
+      ? await db.select().from(clientesTable).where(eq(clientesTable.transportadoraId, transportadoraId))
+      : await db.select().from(clientesTable);
     res.json(rows);
   } catch (err) {
     req.log.error({ err }, "Error listing clientes");
@@ -20,12 +20,13 @@ router.get("/clientes", async (req, res) => {
 
 router.post("/clientes", async (req, res) => {
   try {
-    const { transportadoraId, nome, cnpj, email, emailFinanceiro, telefone, endereco } = req.body;
-
-    const parsedTransportadoraId = Number(transportadoraId);
-    if (!Number.isInteger(parsedTransportadoraId) || parsedTransportadoraId <= 0) {
-      return res.status(400).json({ error: "transportadoraId inválido" });
+    let parsedTransportadoraId: number;
+    try { parsedTransportadoraId = requireTenantId(req); }
+    catch (e) {
+      if (e instanceof TenantScopeError) return res.status(400).json({ error: e.message });
+      throw e;
     }
+    const { nome, cnpj, email, emailFinanceiro, telefone, endereco } = req.body;
 
     if (typeof nome !== "string" || !nome.trim()) {
       return res.status(400).json({ error: "nome é obrigatório" });
@@ -82,6 +83,13 @@ router.patch("/clientes/:id", async (req, res) => {
     const id = parseInt(req.params.id);
     if (Number.isNaN(id)) return res.status(400).json({ error: "id inválido" });
 
+    const tenantId = resolveTenantId(req);
+    const [existing] = await db.select().from(clientesTable).where(eq(clientesTable.id, id));
+    if (!existing) return res.status(404).json({ error: "Cliente não encontrado" });
+    if (typeof tenantId === "number" && existing.transportadoraId !== tenantId) {
+      return res.status(403).json({ error: "Cliente nao pertence a sua empresa" });
+    }
+
     const { nome, cnpj, email, emailFinanceiro, telefone, endereco } = req.body as Record<string, unknown>;
 
     const updates: Record<string, unknown> = {};
@@ -119,8 +127,12 @@ router.delete("/clientes/:id", async (req, res) => {
     const id = parseInt(req.params.id);
     if (Number.isNaN(id)) return res.status(400).json({ error: "id inválido" });
 
+    const tenantId = resolveTenantId(req);
     const [existing] = await db.select().from(clientesTable).where(eq(clientesTable.id, id));
     if (!existing) return res.status(404).json({ error: "Cliente não encontrado" });
+    if (typeof tenantId === "number" && existing.transportadoraId !== tenantId) {
+      return res.status(403).json({ error: "Cliente nao pertence a sua empresa" });
+    }
 
     const viagensVinculadas = await db
       .select({ id: viagensTable.id })

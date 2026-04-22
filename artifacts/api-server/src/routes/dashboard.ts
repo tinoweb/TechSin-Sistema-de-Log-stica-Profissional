@@ -1,12 +1,14 @@
 import { Router, type IRouter } from "express";
 import { db, viagensTable, canhotosTable, faturasTable, motoristasTable, xmlsTable } from "@workspace/db";
 import { eq, and, gte, sql } from "drizzle-orm";
+import { resolveTenantId } from "../lib/tenant-scope";
 
 const router: IRouter = Router();
 
 router.get("/dashboard/summary", async (req, res) => {
   try {
-    const transportadoraId = req.query.transportadoraId ? parseInt(req.query.transportadoraId as string) : undefined;
+    const transportadoraIdRaw = resolveTenantId(req);
+    const transportadoraId = typeof transportadoraIdRaw === "number" ? transportadoraIdRaw : undefined;
 
     const viagens = transportadoraId
       ? await db.select().from(viagensTable).where(eq(viagensTable.transportadoraId, transportadoraId))
@@ -91,7 +93,8 @@ router.get("/dashboard/summary", async (req, res) => {
 
 router.get("/dashboard/cash-flow", async (req, res) => {
   try {
-    const transportadoraId = req.query.transportadoraId ? parseInt(req.query.transportadoraId as string) : undefined;
+    const transportadoraIdRaw = resolveTenantId(req);
+    const transportadoraId = typeof transportadoraIdRaw === "number" ? transportadoraIdRaw : undefined;
     const days = parseInt((req.query.days as string) || "30");
 
     const result = [];
@@ -143,7 +146,8 @@ router.get("/dashboard/cash-flow", async (req, res) => {
 
 router.get("/dashboard/recent-activity", async (req, res) => {
   try {
-    const transportadoraId = req.query.transportadoraId ? parseInt(req.query.transportadoraId as string) : undefined;
+    const transportadoraIdRaw = resolveTenantId(req);
+    const transportadoraId = typeof transportadoraIdRaw === "number" ? transportadoraIdRaw : undefined;
     const limit = parseInt((req.query.limit as string) || "20");
 
     const activities: any[] = [];

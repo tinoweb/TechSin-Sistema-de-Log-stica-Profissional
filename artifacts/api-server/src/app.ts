@@ -1,7 +1,9 @@
 import express, { type Express, type Request, type Response, type NextFunction } from "express";
 import cors from "cors";
+import cookieParser from "cookie-parser";
 import pinoHttp from "pino-http";
 import router from "./routes";
+import { authGuard } from "./middlewares/auth-guard";
 import { logger } from "./lib/logger";
 
 function getPublicOriginsFromEnv(): string[] {
@@ -79,6 +81,12 @@ app.use(
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
-app.use("/api", router);
+/* ── Cookies (sessao JWT) ─────────────────────────────────────────── */
+app.use(cookieParser());
+
+/* ── Auth guard ─────────────────────────────────────────────────────
+ * Bloqueia todas as rotas /api/* exceto as publicas (login, healthz,
+ * rotas do app do motorista acessadas via magic token). */
+app.use("/api", authGuard, router);
 
 export default app;

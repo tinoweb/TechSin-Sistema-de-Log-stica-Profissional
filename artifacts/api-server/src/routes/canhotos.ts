@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { db, canhotosTable, viagensTable, faturasTable, motoristasTable, clientesTable, xmlsTable, transportadorasTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
+import { resolveTenantId } from "../lib/tenant-scope";
 import { randomUUID } from "crypto";
 import { sendBillingEmail } from "../services/email";
 import { extractDocumentDataWithTimeout, computeConfidence } from "../services/ocr";
@@ -103,7 +104,7 @@ router.post("/viagens/:id/canhoto", async (req, res) => {
 
 router.get("/canhotos", async (req, res) => {
   try {
-    const transportadoraId = req.query.transportadoraId ? parseInt(req.query.transportadoraId as string) : undefined;
+    const transportadoraId = resolveTenantId(req);
     const status = req.query.status as string | undefined;
 
     const viagens = await db.select().from(viagensTable);
@@ -112,7 +113,7 @@ router.get("/canhotos", async (req, res) => {
 
     let rows = await db.select().from(canhotosTable);
 
-    if (transportadoraId) {
+    if (typeof transportadoraId === "number") {
       const viagemIds = viagens.filter(v => v.transportadoraId === transportadoraId).map(v => v.id);
       rows = rows.filter(c => viagemIds.includes(c.viagemId));
     }

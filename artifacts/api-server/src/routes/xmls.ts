@@ -2,13 +2,14 @@ import { Router, type IRouter } from "express";
 import { db, xmlsTable, canhotosTable, viagensTable, motoristasTable, clientesTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { extractDocumentData } from "../services/ocr";
+import { resolveTenantId, requireTenantId, TenantScopeError } from "../lib/tenant-scope";
 
 const router: IRouter = Router();
 
 router.get("/xmls", async (req, res) => {
   try {
-    const transportadoraId = req.query.transportadoraId ? parseInt(req.query.transportadoraId as string) : undefined;
-    const rows = transportadoraId
+    const transportadoraId = resolveTenantId(req);
+    const rows = typeof transportadoraId === "number"
       ? await db.select().from(xmlsTable).where(eq(xmlsTable.transportadoraId, transportadoraId))
       : await db.select().from(xmlsTable);
     res.json(rows.map(x => ({ ...x, valorFrete: x.valorFrete ? parseFloat(x.valorFrete as string) : null })));
@@ -20,7 +21,10 @@ router.get("/xmls", async (req, res) => {
 
 router.post("/xmls", async (req, res) => {
   try {
-    const { transportadoraId, tipo, xmlContent, numeroCte, cnpjEmissor, cnpjDestinatario, nomeDestinatario, valorFrete, dataEmissao } = req.body;
+    let transportadoraId: number;
+    try { transportadoraId = requireTenantId(req); }
+    catch (e) { if (e instanceof TenantScopeError) return res.status(400).json({ error: e.message }); throw e; }
+    const { tipo, xmlContent, numeroCte, cnpjEmissor, cnpjDestinatario, nomeDestinatario, valorFrete, dataEmissao } = req.body;
 
     const [created] = await db.insert(xmlsTable).values({
       transportadoraId,
@@ -45,10 +49,12 @@ router.post("/xmls", async (req, res) => {
 /* ── OCR: extrai dados de imagem ou PDF via IA e salva no banco ──── */
 router.post("/xmls/ocr", async (req, res) => {
   try {
-    const { dataUrl, fileName, transportadoraId = 1 } = req.body as {
+    let transportadoraId: number;
+    try { transportadoraId = requireTenantId(req); }
+    catch (e) { if (e instanceof TenantScopeError) return res.status(400).json({ error: e.message }); throw e; }
+    const { dataUrl, fileName } = req.body as {
       dataUrl: string;
       fileName: string;
-      transportadoraId?: number;
     };
 
     if (!dataUrl || !dataUrl.startsWith("data:")) {
