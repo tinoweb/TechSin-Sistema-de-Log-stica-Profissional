@@ -58,13 +58,16 @@ export function verifyAuthToken(token: string): JwtPayload | null {
   }
 }
 
-/* Cookie opts: em producao exige HTTPS (secure=true). */
+/* Cookie opts: em producao exige HTTPS (secure=true).
+ * COOKIE_SECURE=false no .env desabilita o flag Secure (util em dev/staging sem HTTPS). */
 export function authCookieOptions(): import("express").CookieOptions {
   const isProd = process.env["NODE_ENV"] === "production";
+  const cookieSecureEnv = process.env["COOKIE_SECURE"];
+  const secure = cookieSecureEnv === "false" ? false : isProd;
   return {
     httpOnly: true,
-    secure:   isProd,
-    sameSite: isProd ? "strict" : "lax",
+    secure,
+    sameSite: "lax",
     maxAge:   JWT_TTL_SECONDS * 1000,
     path:     "/",
   };

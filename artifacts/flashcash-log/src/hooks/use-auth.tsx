@@ -30,8 +30,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function refresh() {
     try {
-      const me = await api.get<SessaoUsuario>("/auth/me");
-      setUser(me);
+      const me = await api.get<{ user: SessaoUsuario }>("/auth/me");
+      setUser(me.user);
     } catch {
       setUser(null);
     } finally {
