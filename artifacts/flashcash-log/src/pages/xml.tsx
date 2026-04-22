@@ -6,14 +6,20 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   UploadCloud, FileCode2, Link as LinkIcon, CheckCircle2,
   AlertCircle, Package, DollarSign, User, Hash, Calendar,
-  XCircle, FileImage, FileText, Image, Scan, Brain, MapPin
+  XCircle, FileImage, FileText, Image, Scan, Brain, MapPin,
+  Trash2, Filter, CheckSquare, AlertTriangle
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { api } from "@/lib/api-client";
+import { useAuth } from "@/hooks/use-auth";
 
 /* ── Tipos ─────────────────────────────────────────────────────────── */
 type FileCategory = "xml" | "image" | "pdf";
@@ -152,6 +158,7 @@ function DocTypeIcon({ tipo }: { tipo: string }) {
 
 /* ── Componente principal ────────────────────────────────────────────── */
 export default function Xml() {
+  const { user } = useAuth();
   const { data: xmls, isLoading } = useListXmls({ query: { queryKey: ["xmls"] } });
   const queryClient = useQueryClient();
   const { toast }   = useToast();
@@ -160,6 +167,15 @@ export default function Xml() {
   const [result, setResult]             = useState<UploadResult | null>(null);
   const [parseError, setParseError]     = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // New states for improvements
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [filters, setFilters] = useState({ tipo: "todos", status: "todos", destinatario: "", dataInicio: "", dataFim: "" });
+  const [deleteModal, setDeleteModal] = useState<any>(null);
+  const [deleteReason, setDeleteReason] = useState("");
+  const [bulkDeleteModal, setBulkDeleteModal] = useState(false);
+  const [bulkDeleteReason, setBulkDeleteReason] = useState("");
+  const [duplicateWarning, setDuplicateWarning] = useState<{ numeroCte: string; existingId: number } | null>(null);
 
   const uploadMutation = useUploadXml({
     mutation: {
@@ -190,8 +206,10 @@ export default function Xml() {
     setIsProcessing(true);
     setParseError(null);
     setResult(null);
+    setDuplicateWarning(null);
 
     const category = getCategory(file);
+    const tenantId = user?.transportadoraId ?? 1;
 
     try {
       /* ── Imagem (JPG / PNG) — OCR via IA ───────────────────────── */
@@ -204,7 +222,7 @@ export default function Xml() {
           const resp = await api.post<{ ocr: OcrExtracted }>("/xmls/ocr", {
             dataUrl: compressed,
             fileName: file.name,
-            transportadoraId: 1,
+            transportadoraId: tenantId,
           });
           ocr = resp.ocr;
           queryClient.invalidateQueries({ queryKey: getListXmlsQueryKey() });
@@ -225,7 +243,7 @@ export default function Xml() {
         const sizeMB = formatBytes(file.size);
         uploadMutation.mutate({
           data: {
-            transportadoraId: 1,
+            transportadoraId: tenantId,
             tipo: "comprovante" as "cte",
             numeroCte: file.name.replace(/\.pdf$/i, ""),
             nomeDestinatario: "Documento PDF — verificação manual",
@@ -250,10 +268,18 @@ export default function Xml() {
         return;
       }
 
+      // Check for duplicate CT-e
+      const existing = xmls?.find(x => x.numeroCte === parsed.numeroCte && x.tipo !== "comprovante");
+      if (existing) {
+        setDuplicateWarning({ numeroCte: parsed.numeroCte, existingId: existing.id });
+        setResult({ kind: "xml", data: parsed });
+        return;
+      }
+
       setResult({ kind: "xml", data: parsed });
       uploadMutation.mutate({
         data: {
-          transportadoraId: 1,
+          transportadoraId: tenantId,
           tipo: parsed.tipo === "CT-e" ? "cte" : "manifesto",
           xmlContent: text.slice(0, 50000),
           numeroCte: parsed.numeroCte,
@@ -268,7 +294,7 @@ export default function Xml() {
       setIsProcessing(false);
       setParseError("Erro ao processar o arquivo. Verifique o formato e tente novamente.");
     }
-  }, [uploadMutation]);
+  }, [uploadMutation, xmls, user?.transportadoraId]);
 
   const onDragOver  = useCallback((e: React.DragEvent) => { e.preventDefault(); setIsDragging(true); }, []);
   const onDragLeave = useCallback((e: React.DragEvent) => { e.preventDefault(); setIsDragging(false); }, []);
@@ -285,9 +311,81 @@ export default function Xml() {
     e.target.value = "";
   };
 
-  const reset = () => { setResult(null); setParseError(null); };
+  const reset = () => { setResult(null); setParseError(null); setDuplicateWarning(null); };
 
   const showDropZone = !result;
+
+  // Filter logic
+  const filteredXmls = (xmls ?? []).filter(x => {
+    if (filters.tipo !== "todos" && x.tipo !== filters.tipo) return false;
+    if (filters.status !== "todos" && x.status !== filters.status) return false;
+    if (filters.destinatario && !x.nomeDestinatario?.toLowerCase().includes(filters.destinatario.toLowerCase())) return false;
+    if (filters.dataInicio && x.createdAt && new Date(x.createdAt) < new Date(filters.dataInicio)) return false;
+    if (filters.dataFim && x.createdAt && new Date(x.createdAt) > new Date(filters.dataFim)) return false;
+    return true;
+  });
+
+  const toggleSelect = (id: number) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filteredXmls.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredXmls.map(x => x.id)));
+    }
+  };
+
+  const deleteDocument = async (id: number, reason: string) => {
+    try {
+      await api.delete(`/xmls/${id}?motivo=${encodeURIComponent(reason)}`);
+      queryClient.invalidateQueries({ queryKey: getListXmlsQueryKey() });
+      setDeleteModal(null);
+      setDeleteReason("");
+      toast({ title: "Documento excluído." });
+    } catch (e: any) {
+      toast({ title: "Erro ao excluir", description: e.message, variant: "destructive" });
+    }
+  };
+
+  const bulkDelete = async () => {
+    if (selectedIds.size === 0 || !bulkDeleteReason) return;
+    try {
+      await Promise.all(Array.from(selectedIds).map(id =>
+        api.delete(`/xmls/${id}?motivo=${encodeURIComponent(bulkDeleteReason)}`)
+      ));
+      setSelectedIds(new Set());
+      setBulkDeleteModal(false);
+      setBulkDeleteReason("");
+      queryClient.invalidateQueries({ queryKey: getListXmlsQueryKey() });
+      toast({ title: `${selectedIds.size} documentos excluídos!` });
+    } catch (e: any) {
+      toast({ title: "Erro ao excluir em lote", description: e.message, variant: "destructive" });
+    }
+  };
+
+  const forceUpload = () => {
+    if (result?.kind === "xml" && duplicateWarning) {
+      setDuplicateWarning(null);
+      uploadMutation.mutate({
+        data: {
+          transportadoraId: user?.transportadoraId ?? 1,
+          tipo: result.data.tipo === "CT-e" ? "cte" : "manifesto",
+          numeroCte: result.data.numeroCte,
+          cnpjDestinatario: result.data.cnpjDestinatario,
+          nomeDestinatario: result.data.nomeDestinatario,
+          valorFrete: result.data.valorFrete,
+          cnpjEmissor: result.data.cnpjEmissor,
+        }
+      });
+    }
+  };
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
@@ -298,6 +396,74 @@ export default function Xml() {
           Importe CT-e e MDF-e fiscais ou fotos de canhotos e notas — todos os formatos em um só lugar.
         </p>
       </div>
+
+      {/* Filters */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <Filter className="w-3.5 h-3.5" />
+          <span>Filtros:</span>
+        </div>
+        <Select value={filters.tipo} onValueChange={v => setFilters(f => ({ ...f, tipo: v }))}>
+          <SelectTrigger className="h-8 w-32 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todos">Todos os tipos</SelectItem>
+            <SelectItem value="cte">CT-e</SelectItem>
+            <SelectItem value="manifesto">MDF-e</SelectItem>
+            <SelectItem value="comprovante">Comprovante</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={filters.status} onValueChange={v => setFilters(f => ({ ...f, status: v }))}>
+          <SelectTrigger className="h-8 w-32 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todos">Todos os status</SelectItem>
+            <SelectItem value="pendente">Pendente</SelectItem>
+            <SelectItem value="conciliado">Conciliado</SelectItem>
+            <SelectItem value="erro">Divergência</SelectItem>
+          </SelectContent>
+        </Select>
+        <Input
+          placeholder="Destinatário..."
+          value={filters.destinatario}
+          onChange={e => setFilters(f => ({ ...f, destinatario: e.target.value }))}
+          className="h-8 w-40 text-xs"
+        />
+        <Input
+          type="date"
+          value={filters.dataInicio}
+          onChange={e => setFilters(f => ({ ...f, dataInicio: e.target.value }))}
+          className="h-8 w-36 text-xs"
+        />
+        <Input
+          type="date"
+          value={filters.dataFim}
+          onChange={e => setFilters(f => ({ ...f, dataFim: e.target.value }))}
+          className="h-8 w-36 text-xs"
+        />
+        {(filters.tipo !== "todos" || filters.status !== "todos" || filters.destinatario || filters.dataInicio || filters.dataFim) && (
+          <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => setFilters({ tipo: "todos", status: "todos", destinatario: "", dataInicio: "", dataFim: "" })}>
+            Limpar
+          </Button>
+        )}
+      </div>
+
+      {/* Bulk actions bar */}
+      {selectedIds.size > 0 && (
+        <div className="flex items-center justify-between px-4 py-2 rounded-lg bg-primary/10 border border-primary/20">
+          <div className="flex items-center gap-2 text-xs">
+            <CheckSquare className="w-4 h-4 text-primary" />
+            <span className="text-foreground font-medium">{selectedIds.size} selecionado{selectedIds.size > 1 ? "s" : ""}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" className="h-8 text-xs gap-1" onClick={() => setBulkDeleteModal(true)}>
+              <Trash2 className="w-3 h-3" /> Excluir
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Upload card */}
       <div className="bg-card border border-border rounded-lg overflow-hidden">
@@ -385,12 +551,37 @@ export default function Xml() {
             </div>
           )}
 
+          {/* Duplicate warning */}
+          {duplicateWarning && (
+            <div className="flex items-start gap-3 px-4 py-3 rounded-lg border border-amber-500/30 bg-amber-500/5">
+              <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-xs font-semibold text-amber-300">CT-e Duplicado Detectado</p>
+                <p className="text-xs text-amber-400/80 mt-1">
+                  O CT-e <strong>{duplicateWarning.numeroCte}</strong> já existe no sistema (ID: {duplicateWarning.existingId}).
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" className="h-7 text-xs border-border text-muted-foreground" onClick={reset}>
+                  Cancelar
+                </Button>
+                <Button size="sm" className="h-7 text-xs bg-amber-500 hover:bg-amber-600 text-white" onClick={forceUpload}>
+                  Forçar Upload
+                </Button>
+              </div>
+            </div>
+          )}
+
           {/* Resultado XML extraído */}
           {result?.kind === "xml" && (
-            <div className="border border-success/20 rounded-lg bg-success/3 overflow-hidden">
-              <div className="px-4 py-3 border-b border-success/15 flex items-center justify-between">
+            <div className={`border rounded-lg overflow-hidden ${duplicateWarning ? "border-amber-500/30 bg-amber-500/5" : "border-success/20 bg-success/3"}`}>
+              <div className={`px-4 py-3 border-b flex items-center justify-between ${duplicateWarning ? "border-amber-500/20" : "border-success/15"}`}>
                 <div className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-success" />
+                  {duplicateWarning ? (
+                    <AlertTriangle className="w-4 h-4 text-amber-400" />
+                  ) : (
+                    <CheckCircle2 className="w-4 h-4 text-success" />
+                  )}
                   <span className="text-sm font-semibold text-foreground">Dados Extraídos — {result.data.tipo}</span>
                 </div>
                 <Button size="sm" variant="outline" className="h-7 text-xs border-border text-muted-foreground hover:text-foreground" onClick={reset}>
@@ -537,37 +728,53 @@ export default function Xml() {
       <div className="bg-card border border-border rounded-lg overflow-hidden">
         <div className="px-5 py-4 border-b border-border flex items-center justify-between">
           <h3 className="text-sm font-semibold text-foreground">Documentos Processados</h3>
-          {xmls?.length ? (
-            <span className="text-[10px] text-muted-foreground">{xmls.length} registros</span>
+          {filteredXmls.length ? (
+            <span className="text-[10px] text-muted-foreground">{filteredXmls.length} registro{filteredXmls.length !== 1 ? "s" : ""}</span>
           ) : null}
         </div>
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent border-border">
+              <TableHead className="w-10 text-center">
+                <Checkbox
+                  checked={selectedIds.size === filteredXmls.length && filteredXmls.length > 0}
+                  onCheckedChange={toggleSelectAll}
+                  className="mx-auto"
+                />
+              </TableHead>
               <TableHead className="text-xs font-medium text-muted-foreground">Documento</TableHead>
               <TableHead className="text-xs font-medium text-muted-foreground">Destinatário / Descrição</TableHead>
               <TableHead className="text-xs font-medium text-muted-foreground">Valor</TableHead>
               <TableHead className="text-xs font-medium text-muted-foreground">Conciliação</TableHead>
-              <TableHead className="text-xs font-medium text-muted-foreground text-right">Ação</TableHead>
+              <TableHead className="text-xs font-medium text-muted-foreground text-right">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
               <TableRow className="border-border hover:bg-transparent">
-                <TableCell colSpan={5} className="py-8 text-center text-xs text-muted-foreground">Carregando...</TableCell>
+                <TableCell colSpan={6} className="py-8 text-center text-xs text-muted-foreground">Carregando...</TableCell>
               </TableRow>
-            ) : !xmls?.length ? (
+            ) : !filteredXmls.length ? (
               <TableRow className="border-border hover:bg-transparent">
-                <TableCell colSpan={5} className="py-10 text-center">
+                <TableCell colSpan={6} className="py-10 text-center">
                   <AlertCircle className="w-5 h-5 text-muted-foreground mx-auto mb-2" />
-                  <p className="text-xs text-muted-foreground">Nenhum documento processado. Faça o upload acima.</p>
+                  <p className="text-xs text-muted-foreground">
+                    {xmls?.length ? "Nenhum documento encontrado com os filtros aplicados." : "Nenhum documento processado. Faça o upload acima."}
+                  </p>
                 </TableCell>
               </TableRow>
             ) : (
-              xmls.map((x) => {
+              filteredXmls.map((x) => {
                 const isComprovante = x.tipo === "comprovante";
                 return (
                   <TableRow key={x.id} className="border-border hover:bg-white/3 transition-colors">
+                    <TableCell className="text-center">
+                      <Checkbox
+                        checked={selectedIds.has(x.id)}
+                        onCheckedChange={() => toggleSelect(x.id)}
+                        className="mx-auto"
+                      />
+                    </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <DocTypeIcon tipo={x.tipo} />
@@ -610,17 +817,27 @@ export default function Xml() {
                       )}
                     </TableCell>
                     <TableCell className="text-right">
-                      {x.status === "pendente" && !isComprovante && (
+                      <div className="flex justify-end gap-1.5">
+                        {x.status === "pendente" && !isComprovante && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs border-primary/30 text-primary hover:bg-primary/10 hover:text-primary"
+                            onClick={() => matchMutation.mutate({ id: x.id })}
+                            disabled={matchMutation.isPending}
+                          >
+                            <LinkIcon className="w-3 h-3 mr-1.5" /> Conciliar
+                          </Button>
+                        )}
                         <Button
                           size="sm"
                           variant="outline"
-                          className="h-7 text-xs border-primary/30 text-primary hover:bg-primary/10 hover:text-primary"
-                          onClick={() => matchMutation.mutate({ id: x.id })}
-                          disabled={matchMutation.isPending}
+                          className="h-7 w-7 p-0 border-destructive/40 text-destructive hover:bg-destructive/10"
+                          onClick={() => { setDeleteModal(x); setDeleteReason(""); }}
                         >
-                          <LinkIcon className="w-3 h-3 mr-1.5" /> Conciliar
+                          <Trash2 className="w-3 h-3" />
                         </Button>
-                      )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 );
@@ -629,6 +846,100 @@ export default function Xml() {
           </TableBody>
         </Table>
       </div>
+
+      {/* Delete Modal */}
+      {deleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: "rgba(0,0,0,0.75)" }}>
+          <div className="bg-card border border-border rounded-xl w-full max-w-sm shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="px-6 py-4 border-b border-border flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Trash2 className="w-4 h-4 text-destructive" />
+                <h3 className="text-sm font-semibold text-foreground">Excluir Documento</h3>
+              </div>
+              <button onClick={() => setDeleteModal(null)} className="w-7 h-7 rounded flex items-center justify-center hover:bg-white/8">
+                <XCircle className="w-4 h-4 text-muted-foreground" />
+              </button>
+            </div>
+            <div className="px-6 py-5 space-y-4">
+              <p className="text-xs text-muted-foreground">
+                Tem certeza que deseja excluir o documento <strong>{deleteModal.numeroCte || deleteModal.tipo.toUpperCase()}</strong>?
+              </p>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Motivo da exclusão</Label>
+                <Select value={deleteReason} onValueChange={setDeleteReason}>
+                  <SelectTrigger className="h-9 text-sm">
+                    <SelectValue placeholder="Selecione o motivo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Documento duplicado">Documento duplicado</SelectItem>
+                    <SelectItem value="Erro no upload">Erro no upload</SelectItem>
+                    <SelectItem value="Dados incorretos">Dados incorretos</SelectItem>
+                    <SelectItem value="Não utilizado">Não utilizado</SelectItem>
+                    <SelectItem value="Outro">Outro</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="px-6 pb-5 flex gap-3">
+              <Button variant="outline" className="flex-1 h-9 text-sm border-border text-muted-foreground" onClick={() => setDeleteModal(null)}>Cancelar</Button>
+              <Button
+                className="flex-1 h-9 text-sm font-semibold bg-destructive hover:bg-destructive/90"
+                onClick={() => deleteDocument(deleteModal.id, deleteReason)}
+                disabled={!deleteReason}
+              >
+                <Trash2 className="w-3.5 h-3.5 mr-1.5" /> Excluir
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Delete Modal */}
+      {bulkDeleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: "rgba(0,0,0,0.75)" }}>
+          <div className="bg-card border border-border rounded-xl w-full max-w-sm shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="px-6 py-4 border-b border-border flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Trash2 className="w-4 h-4 text-destructive" />
+                <h3 className="text-sm font-semibold text-foreground">Excluir em Lote ({selectedIds.size})</h3>
+              </div>
+              <button onClick={() => setBulkDeleteModal(false)} className="w-7 h-7 rounded flex items-center justify-center hover:bg-white/8">
+                <XCircle className="w-4 h-4 text-muted-foreground" />
+              </button>
+            </div>
+            <div className="px-6 py-5 space-y-4">
+              <p className="text-xs text-muted-foreground">
+                Tem certeza que deseja excluir {selectedIds.size} documento{selectedIds.size > 1 ? "s" : ""}?
+              </p>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Motivo da exclusão</Label>
+                <Select value={bulkDeleteReason} onValueChange={setBulkDeleteReason}>
+                  <SelectTrigger className="h-9 text-sm">
+                    <SelectValue placeholder="Selecione o motivo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Documento duplicado">Documento duplicado</SelectItem>
+                    <SelectItem value="Erro no upload">Erro no upload</SelectItem>
+                    <SelectItem value="Dados incorretos">Dados incorretos</SelectItem>
+                    <SelectItem value="Não utilizado">Não utilizado</SelectItem>
+                    <SelectItem value="Outro">Outro</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="px-6 pb-5 flex gap-3">
+              <Button variant="outline" className="flex-1 h-9 text-sm border-border text-muted-foreground" onClick={() => setBulkDeleteModal(false)}>Cancelar</Button>
+              <Button
+                className="flex-1 h-9 text-sm font-semibold bg-destructive hover:bg-destructive/90"
+                onClick={bulkDelete}
+                disabled={!bulkDeleteReason}
+              >
+                <Trash2 className="w-3.5 h-3.5 mr-1.5" /> Excluir {selectedIds.size}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
