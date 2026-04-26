@@ -231,8 +231,8 @@ export default function Aprovacao() {
       toast({
         title: "Canhoto aprovado!",
         description: result?.emailEnviado
-          ? "Fatura gerada e e-mail de cobrança enviado ao cliente."
-          : "Fatura gerada. E-mail de cobrança registrado (configure RESEND_API_KEY para envio real).",
+          ? "Faturamento expresso de cobrança enviado por e-mail (e WhatsApp quando configurados)."
+          : "Faturamento expresso registrado; cobrança aguardando envio (configure RESEND_API_KEY para disparos reais).",
       });
     } catch (e: any) {
       toast({ title: "Erro ao aprovar", description: e.message, variant: "destructive" });

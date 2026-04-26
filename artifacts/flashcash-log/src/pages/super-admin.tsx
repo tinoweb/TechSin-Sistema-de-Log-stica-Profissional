@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   ShieldCheck, Building2, Users, Truck, FileText, CheckCircle2,
-  XCircle, Plus, RefreshCw, TrendingUp, Lock, Unlock, X, Globe
+  XCircle, Plus, RefreshCw, TrendingUp, Lock, Unlock, X, Globe, Trash2, AlertTriangle
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -35,6 +35,8 @@ export default function SuperAdmin() {
   const [showCreate, setShowCreate] = useState(false);
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState({ nome: "", cnpj: "", email: "", emailFinanceiro: "", telefone: "", plano: "starter" });
+  const [clearing, setClearing] = useState<number | null>(null);
+  const [confirmClearModal, setConfirmClearModal] = useState<Transportadora | null>(null);
   const { toast } = useToast();
 
   const load = useCallback(async () => {
@@ -74,6 +76,18 @@ export default function SuperAdmin() {
     } catch (e: any) {
       toast({ title: "Erro ao cadastrar", description: e.message, variant: "destructive" });
     } finally { setCreating(false); }
+  };
+
+  const clearTransportadoraData = async (t: Transportadora) => {
+    setClearing(t.id);
+    try {
+      await api.post(`/super-admin/transportadoras/${t.id}/clear`, {});
+      await load();
+      setConfirmClearModal(null);
+      toast({ title: `Dados de teste da ${t.nome} apagados!`, description: "Ambiente pronto para uso real." });
+    } catch (e: any) {
+      toast({ title: "Erro ao limpar dados", description: e.message, variant: "destructive" });
+    } finally { setClearing(null); }
   };
 
   const g = data?.global;
@@ -176,6 +190,14 @@ export default function SuperAdmin() {
                     <Button
                       size="sm"
                       variant="outline"
+                      className="h-8 text-xs border-amber-500/30 text-amber-500 hover:bg-amber-500/8"
+                      onClick={() => setConfirmClearModal(t)}
+                    >
+                      <Trash2 className="w-3 h-3 mr-1.5" /> Limpar Dados
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
                       className={`h-8 text-xs ${t.ativo ? "border-destructive/30 text-destructive hover:bg-destructive/8" : "border-success/30 text-success hover:bg-success/8"}`}
                       disabled={toggling === t.id}
                       onClick={() => toggleStatus(t.id, t.nome, t.ativo)}
@@ -198,50 +220,71 @@ export default function SuperAdmin() {
 
       {/* Create Modal */}
       {showCreate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: "rgba(0,0,0,0.75)" }}>
-          <div className="bg-card border border-border rounded-xl w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200">
-            <div className="px-6 py-4 border-b border-border flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-foreground">Cadastrar Nova Transportadora</h3>
-              <button onClick={() => setShowCreate(false)} className="w-7 h-7 rounded flex items-center justify-center hover:bg-white/8">
-                <X className="w-4 h-4 text-muted-foreground" />
-              </button>
-            </div>
-            <div className="px-6 py-5 space-y-3.5">
-              {[
-                { key: "nome", label: "Nome da Empresa *", placeholder: "Flash Transportes LTDA" },
-                { key: "cnpj", label: "CNPJ *", placeholder: "00.000.000/0001-00" },
-                { key: "email", label: "E-mail *", placeholder: "contato@empresa.com.br" },
-                { key: "emailFinanceiro", label: "E-mail Financeiro", placeholder: "financeiro@empresa.com.br" },
-                { key: "telefone", label: "Telefone", placeholder: "(11) 9xxxx-xxxx" },
-              ].map(({ key, label, placeholder }) => (
-                <div key={key} className="space-y-1.5">
-                  <Label className="text-xs font-medium text-muted-foreground">{label}</Label>
-                  <Input
-                    className="h-9 text-sm bg-background border-border"
-                    placeholder={placeholder}
-                    value={(form as any)[key]}
-                    onChange={e => setForm(p => ({ ...p, [key]: e.target.value }))}
-                  />
-                </div>
-              ))}
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80">
+          <div className="bg-card border border-border rounded-xl w-full max-w-md shadow-2xl p-6">
+            <h3 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
+              <Building2 className="w-5 h-5 text-amber-400" /> Cadastrar Transportadora
+            </h3>
+            <div className="space-y-4">
               <div className="space-y-1.5">
-                <Label className="text-xs font-medium text-muted-foreground">Plano</Label>
-                <select
-                  className="w-full h-9 text-sm bg-background border border-border rounded px-3 text-foreground"
-                  value={form.plano}
-                  onChange={e => setForm(p => ({ ...p, plano: e.target.value }))}
-                >
-                  <option value="starter">Starter</option>
-                  <option value="pro">Pro</option>
-                  <option value="enterprise">Enterprise</option>
-                </select>
+                <Label className="text-xs">Razão Social / Nome</Label>
+                <Input value={form.nome} onChange={e => setForm({ ...form, nome: e.target.value })} className="h-9 text-sm" placeholder="Ex: Trans Logistica LTDA" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">CNPJ</Label>
+                  <Input value={form.cnpj} onChange={e => setForm({ ...form, cnpj: e.target.value })} className="h-9 text-sm" placeholder="00.000.000/0000-00" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Telefone</Label>
+                  <Input value={form.telefone} onChange={e => setForm({ ...form, telefone: e.target.value })} className="h-9 text-sm" placeholder="(00) 0000-0000" />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">E-mail Principal</Label>
+                <Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} className="h-9 text-sm" placeholder="admin@empresa.com.br" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">E-mail Financeiro (Opcional)</Label>
+                <Input type="email" value={form.emailFinanceiro} onChange={e => setForm({ ...form, emailFinanceiro: e.target.value })} className="h-9 text-sm" placeholder="financeiro@empresa.com.br" />
               </div>
             </div>
-            <div className="px-6 pb-5 flex gap-3">
-              <Button variant="outline" className="flex-1 h-9 text-sm" onClick={() => setShowCreate(false)}>Cancelar</Button>
-              <Button className="flex-1 h-9 text-sm font-semibold" style={{ background: "linear-gradient(135deg, #d97706, #f59e0b)" }} onClick={createTransportadora} disabled={creating}>
-                {creating ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <><Plus className="w-3.5 h-3.5 mr-1.5" /> Cadastrar</>}
+            <div className="flex w-full gap-3 mt-6">
+              <Button variant="outline" className="flex-1 border-border text-muted-foreground" onClick={() => setShowCreate(false)}>Cancelar</Button>
+              <Button className="flex-1 font-semibold" style={{ background: "linear-gradient(135deg, #d97706, #f59e0b)" }} onClick={createTransportadora} disabled={creating}>
+                {creating ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
+                Cadastrar
               </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirm Clear Modal */}
+      {confirmClearModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80">
+          <div className="bg-card border border-border rounded-xl w-full max-w-sm shadow-2xl p-6">
+            <div className="flex flex-col items-center text-center space-y-4">
+              <div className="w-12 h-12 rounded-full flex items-center justify-center bg-red-500/10 border border-red-500/20">
+                <AlertTriangle className="w-6 h-6 text-red-500" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-foreground">Limpar {confirmClearModal.nome}?</h3>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Isso irá apagar <strong>todas</strong> as Viagens, Faturas, Canhotos, XMLs, Clientes e Motoristas dessa transportadora.
+                  As configurações da empresa e plano serão mantidos.
+                </p>
+                <p className="text-xs font-semibold text-destructive mt-2">Essa ação é irreversível.</p>
+              </div>
+              <div className="flex w-full gap-3 mt-2">
+                <Button variant="outline" className="flex-1 border-border" onClick={() => setConfirmClearModal(null)} disabled={clearing === confirmClearModal.id}>
+                  Cancelar
+                </Button>
+                <Button variant="destructive" className="flex-1" onClick={() => clearTransportadoraData(confirmClearModal)} disabled={clearing === confirmClearModal.id}>
+                  {clearing === confirmClearModal.id ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <Trash2 className="w-4 h-4 mr-2" />}
+                  Apagar Tudo
+                </Button>
+              </div>
             </div>
           </div>
         </div>

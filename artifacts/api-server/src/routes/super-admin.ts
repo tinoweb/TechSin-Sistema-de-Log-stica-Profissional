@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, transportadorasTable, motoristasTable, canhotosTable, viagensTable } from "@workspace/db";
+import { db, transportadorasTable, motoristasTable, canhotosTable, viagensTable, clientesTable, faturasTable, xmlsTable } from "@workspace/db";
 import { eq, count, sum } from "drizzle-orm";
 
 const router: IRouter = Router();
@@ -70,6 +70,45 @@ router.post("/super-admin/transportadoras", async (req, res) => {
   } catch (err) {
     req.log.error({ err }, "Error creating transportadora via super admin");
     res.status(500).json({ error: err instanceof Error ? err.message : "Internal server error" });
+  }
+});
+
+router.post("/super-admin/transportadoras/:id/clear", async (req, res) => {
+  try {
+    const transportadoraId = parseInt(req.params.id);
+    
+    // Apagar Faturas
+    await db.delete(faturasTable).where(eq(faturasTable.transportadoraId, transportadoraId));
+    
+    // Apagar XMLs
+    await db.delete(xmlsTable).where(eq(xmlsTable.transportadoraId, transportadoraId));
+    
+    // Canhotos (estão vinculados à viagem)
+    const canhotosRes = await db.select({ id: canhotosTable.id })
+      .from(canhotosTable)
+      .innerJoin(viagensTable, eq(canhotosTable.viagemId, viagensTable.id))
+      .where(eq(viagensTable.transportadoraId, transportadoraId));
+      
+    if (canhotosRes.length > 0) {
+      for (const c of canhotosRes) {
+        await db.delete(canhotosTable).where(eq(canhotosTable.id, c.id));
+      }
+    }
+    
+    // Apagar Viagens
+    await db.delete(viagensTable).where(eq(viagensTable.transportadoraId, transportadoraId));
+    
+    // Apagar Clientes
+    await db.delete(clientesTable).where(eq(clientesTable.transportadoraId, transportadoraId));
+    
+    // Apagar Motoristas
+    await db.delete(motoristasTable).where(eq(motoristasTable.transportadoraId, transportadoraId));
+    
+    req.log.info({ transportadoraId }, "Dados de teste limpos com sucesso");
+    res.json({ success: true, message: "Ambiente limpo! Pronto para uso real." });
+  } catch (err) {
+    req.log.error({ err }, "Error clearing transportadora data");
+    res.status(500).json({ error: "Internal server error" });
   }
 });
 

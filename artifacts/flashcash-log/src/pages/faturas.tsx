@@ -1,3 +1,5 @@
+import { useCallback } from "react";
+import type { Fatura } from "@workspace/api-client-react";
 import { useListFaturas, useEnviarFatura, useAnteciparFatura, getListFaturasQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -37,12 +39,31 @@ export default function Faturas() {
     mutation: {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getListFaturasQueryKey() });
-        toast({ title: "Kit de faturamento enviado ao cliente." });
+        toast({ title: "Kit de faturamento enviado!", description: "E-mail disparado e WhatsApp preparado para o cliente." });
       }
     }
   });
 
   const totalPendente = faturas?.filter(f => f.status === "pendente").reduce((s, f) => s + f.valor, 0) ?? 0;
+
+  const sendBillingWhatsApp = useCallback((f: Fatura) => {
+    if (typeof window === "undefined") return;
+    const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+    const link = `${window.location.origin}${base}/entrega/${f.viagemId}`;
+    const greeting = f.clienteNome ? `Olá ${f.clienteNome}!` : "Olá!";
+    const nfInfo = f.numeroFatura ? `NF ${f.numeroFatura}` : `Viagem ${f.viagemId}`;
+    const message = `${greeting} Segue o link do kit de faturamento ${nfInfo} no TechSin:\n${link}`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, "_blank");
+  }, []);
+
+  const handleSendKit = (f: Fatura) => {
+    enviarMutation.mutate(
+      { id: f.id },
+      {
+        onSuccess: () => sendBillingWhatsApp(f),
+      }
+    );
+  };
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
@@ -137,7 +158,7 @@ export default function Faturas() {
                           size="sm"
                           variant="outline"
                           className="h-7 text-xs border-border text-muted-foreground hover:text-foreground hover:bg-white/5"
-                          onClick={() => enviarMutation.mutate({ id: f.id })}
+                          onClick={() => handleSendKit(f)}
                           disabled={enviarMutation.isPending}
                         >
                           <Send className="w-3 h-3 mr-1.5" /> Kit Fat.
