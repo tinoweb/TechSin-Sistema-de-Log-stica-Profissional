@@ -170,7 +170,19 @@ router.get("/dashboard/recent-activity", async (req, res) => {
       });
     }
 
-    const canhotos = await db.select().from(canhotosTable).limit(5);
+    const canhotos = transportadoraId
+      ? await db
+          .select({
+            id: canhotosTable.id,
+            sealId: canhotosTable.sealId,
+            status: canhotosTable.status,
+            createdAt: canhotosTable.createdAt,
+          })
+          .from(canhotosTable)
+          .innerJoin(viagensTable, eq(canhotosTable.viagemId, viagensTable.id))
+          .where(eq(viagensTable.transportadoraId, transportadoraId))
+          .limit(5)
+      : await db.select().from(canhotosTable).limit(5);
     for (const c of canhotos) {
       activities.push({
         id: idCounter++,
